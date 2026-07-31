@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://koneect.local/schema/canonical/997.schema.json",
+  "title": "Canonical 997 (Functional Acknowledgment) — direction-NEUTRAL, NOT a business doc",
+  "description": "Acknowledges a functional group/transaction set that was exchanged, and reconciles against control numbers (kon_x12datas). Direction is a relationship property: a client that SENDS docs RECEIVES 997s (reconcile what we sent); a client that RECEIVES docs SENDS 997s (ack what we got). Same shape either way; `_meta` populated only on inbound. See mapping-design.md §7.",
+  "type": "object",
+  "required": ["functionalAck"],
+  "additionalProperties": false,
+  "properties": {
+    "functionalAck": {
+      "type": "object",
+      "required": ["acknowledges", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "acknowledges": {
+          "type": "object",
+          "description": "Which group/set this 997 responds to (AK1/AK2).",
+          "additionalProperties": false,
+          "properties": {
+            "functionalIdCode": { "type": "string", "description": "AK101, e.g. PO, IN." },
+            "groupControlNumber": { "type": "string", "description": "AK102 / AK902 — matches a GS06." },
+            "transactionSetControlNumbers": { "type": "array", "items": { "type": "string" }, "description": "AK202 — matches ST02(s)." }
+          }
+        },
+        "status": {
+          "type": "string",
+          "description": "AK501 / AK901: A=accepted, E=accepted w/ errors, R=rejected, P=partial, M/W/X variants.",
+          "enum": ["A", "E", "P", "R", "M", "W", "X", "unknown"]
+        },
+        "errors": {
+          "type": "array",
+          "description": "AK3/AK4/AK5 error detail, when present.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "segmentId": { "type": "string" },
+              "position": { "type": ["integer", "string"] },
+              "elementPosition": { "type": ["integer", "string"] },
+              "code": { "type": "string" },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "description": "Engine-populated link back to the matched document.",
+      "additionalProperties": false,
+      "properties": {
+        "settingId": { "type": ["integer", "string"] },
+        "matched": { "type": "boolean", "description": "Whether the acknowledged control numbers were found in kon_x12datas." }
+      }
+    },
+    "_meta": { "$ref": "common.schema.json#/definitions/inboundMeta" }
+  }
+}

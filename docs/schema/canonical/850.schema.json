@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://koneect.local/schema/canonical/850.schema.json",
+  "title": "Canonical 850 (Purchase Order) — business document, direction-NEUTRAL",
+  "description": "A Purchase Order's business facts. The SAME shape regardless of which side the client is on: it is the product's INPUT when the client SENDS an 850 (buyer/retailer role, e.g. VirVentures), and the product's OUTPUT when the client RECEIVES an 850 (supplier/vendor role, e.g. EMRY). Direction is a property of the (client, partner, docType) RELATIONSHIP, not of this schema — it selects build-vs-parse and which map runs. On inbound, `_meta` is populated; on outbound it is absent. PURE BUSINESS: no X12 quirks (those live in the map), no master data (config), no derived values (enrichment). Provenance: coreapp $eA. See README.md.",
+  "type": "object",
+  "required": ["partnerKey", "poNumber", "poDate", "shipTo", "lines"],
+  "additionalProperties": false,
+  "properties": {
+    "partnerKey": {
+      "type": "string",
+      "description": "The trading partner on the OTHER side of this relationship; selects the map + partner master config. coreapp: VENDOR_PRIME_KEY / vendorRec.prefix."
+    },
+    "poNumber": { "type": "string", "description": "coreapp: PO_NUMBER -> BEG03 (outbound) / from BEG03 (inbound)." },
+    "orderId": { "type": "string", "description": "coreapp: ORDER_PRIMARY_KEY / ORDER_ID." },
+    "poDate": { "type": "string", "format": "date", "description": "coreapp: PURCHASE_ORDER_DATE. ISO; map formats to/from CCYYMMDD." },
+    "orderDate": { "type": "string", "format": "date", "description": "coreapp: ORDER_DATE." },
+
+    "shipTo": {
+      "type": "object",
+      "description": "Dropship destination as raw business fields (coreapp CUST_*). N1/N3/N4 split, address line breaking, state-name->code are the map's/enrichment's job.",
+      "required": ["name", "address"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "coreapp: CUST_FULL_NAME." },
+        "phone": { "type": "string", "description": "coreapp: CUST_PHONE." },
+        "address": { "$ref": "common.schema.json#/definitions/address" }
+      }
+    },
+
+    "references": {
+      "type": "array",
+      "description": "Business references the client genuinely knows (e.g. department). NOT partner X12 qualifier choices — those belong in the map.",
+      "items": { "$ref": "common.schema.json#/definitions/typedValue" }
+    },
+
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["qty", "sku"],
+        "additionalProperties": false,
+        "properties": {
+          "qty": { "type": ["number", "string"], "description": "coreapp: ORDERED_QTY. string OR number on purpose — coercion normalizes (engine-structure.md §3)." },
+          "sku": { "type": "string", "description": "coreapp: SKU -> buyer part (po109)." },
+          "vendorItem": { "type": "string", "description": "coreapp: SUPP_KEYFIELD -> vendor part (po107)." },
+          "unitCost": { "type": ["number", "string"], "description": "coreapp: SUPP_COST_PRICE." },
+          "promoPrice": { "type": ["number", "string"], "description": "coreapp: SUPP_PROMO_PRICE; enrichment prefers it when > 0." },
+          "shippingPrice": { "type": ["number", "string"], "description": "coreapp: SUPP_SHIPPING_PRICE." },
+          "title": { "type": "string", "description": "coreapp: SUPP_PRODUCT_TITLE (raw). Product truncates/sanitizes -> pid05." },
+          "carrier": { "type": "string", "description": "coreapp: SKU_SHIPPING_CARRIER." },
+          "service": { "type": "string", "description": "coreapp: SKU_SHIPPING_SERVICE." }
+        }
+      }
+    },
+
+    "extensions": {
+      "type": "object",
+      "description": "Escape hatch for true one-offs; recurring entries graduate to first-class fields once, for everyone.",
+      "additionalProperties": true
+    },
+
+    "_meta": {
+      "$ref": "common.schema.json#/definitions/inboundMeta",
+      "description": "Populated ONLY when this 850 was RECEIVED (supplier role). Absent on outbound."
+    }
+  }
+}

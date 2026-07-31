@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *platform/*.ts) cd \"$(git rev-parse --show-toplevel)/platform\" && npx tsc --noEmit || exit 2;; esac",
+            "timeout": 120,
+            "statusMessage": "Typechecking platform…"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "root=$(git rev-parse --show-toplevel); if git -C \"$root\" status --porcelain -- platform | grep -q .; then cd \"$root/platform\" && npm test || exit 2; fi",
+            "timeout": 180,
+            "statusMessage": "Running platform tests…"
+          }
+        ]
+      }
+    ]
+  }
+}

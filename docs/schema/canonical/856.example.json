@@ -1,0 +1,31 @@
+{
+  "$comment": "Business 856 (ASN), grounded in kon_856lists id 224007 (EMRY ASN for PO EMRY-49316). Shown as a SEND example (SUPPLIER role -> product builds outbound X12 with engine-managed HL hierarchy). The same shape is what a BUYER-role client RECEIVES (parsed inbound, plus `_meta`). Note real EMRY ASNs are degenerate hierarchies: 1 order / 1 carton / 1 line, MAN01=CP + carrier pack id (not GM/SSCC-18). Validates against 856.schema.json.",
+  "partnerKey": "EMRY",
+  "shipment": {
+    "shipmentId": "8122964948",
+    "purpose": "00",
+    "date": "2026-06-07",
+    "time": "0932",
+    "weight": { "value": 7.6, "uom": "LB" },
+    "carrier": { "scac": "FDEG", "method": "2", "routingDescription": "FedEx Ground" },
+    "orders": [
+      {
+        "poNumber": "EMRY-49316",
+        "packs": [
+          {
+            "sscc": "522575439126",
+            "markType": "CP",
+            "packagingType": "CTN",
+            "items": [
+              {
+                "vendorItem": "3458148",
+                "qtyShipped": 2,
+                "uom": "EA"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

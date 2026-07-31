@@ -1,0 +1,133 @@
+{
+  "$comment": "Illustrative, partner-agnostic 850 outbound map. Demonstrates how the hardcoded BEG->REF->PER->DTM->[TD5]->N1*->N3->N4->[BT]->{PO1/PID}->[CTT] sequence and the is_td5/is_ctt/inc_vadd/is_sac_decimal flags become declarative data. Not derived from any real partner spec.",
+  "partner": "EXAMPLE_CO",
+  "docType": "850",
+  "direction": "outbound",
+  "functionalId": "PO",
+  "version": "004010",
+  "structure": [
+    {
+      "segment": "BEG",
+      "elements": [
+        { "pos": 1, "path": "po.purpose", "default": "00" },
+        { "pos": 2, "path": "po.type", "default": "SA" },
+        { "pos": 3, "path": "po.poNumber" },
+        { "pos": 5, "path": "po.date", "format": "CCYYMMDD" }
+      ]
+    },
+    {
+      "segment": "REF",
+      "over": "po.references",
+      "when": "po.references",
+      "elements": [
+        { "pos": 1, "path": "$item.qualifier" },
+        { "pos": 2, "path": "$item.value" }
+      ]
+    },
+    {
+      "segment": "PER",
+      "when": "po.contact",
+      "elements": [
+        { "pos": 1, "const": "BD" },
+        { "pos": 2, "path": "po.contact.name" },
+        { "pos": 3, "const": "TE" },
+        { "pos": 4, "path": "po.contact.phone" }
+      ]
+    },
+    {
+      "segment": "DTM",
+      "when": "po.requestedShipDate",
+      "elements": [
+        { "pos": 1, "const": "010" },
+        { "pos": 2, "path": "po.requestedShipDate", "format": "CCYYMMDD" }
+      ]
+    },
+    {
+      "loop": "shipTo",
+      "segments": [
+        {
+          "segment": "N1",
+          "elements": [
+            { "pos": 1, "const": "ST" },
+            { "pos": 2, "path": "po.shipTo.name" }
+          ]
+        },
+        {
+          "segment": "N3",
+          "elements": [ { "pos": 1, "path": "po.shipTo.address1" } ]
+        },
+        {
+          "segment": "N4",
+          "elements": [
+            { "pos": 1, "path": "po.shipTo.city" },
+            { "pos": 2, "path": "po.shipTo.state" },
+            { "pos": 3, "path": "po.shipTo.zip" },
+            { "pos": 4, "path": "po.shipTo.country", "default": "US" }
+          ]
+        }
+      ]
+    },
+    {
+      "loop": "billTo",
+      "when": "po.billTo",
+      "$comment": "Replaces inc_vadd: present only when a billTo exists.",
+      "segments": [
+        {
+          "segment": "N1",
+          "elements": [
+            { "pos": 1, "const": "BT" },
+            { "pos": 2, "path": "po.billTo.name" }
+          ]
+        },
+        { "segment": "N3", "elements": [ { "pos": 1, "path": "po.billTo.address1" } ] },
+        {
+          "segment": "N4",
+          "elements": [
+            { "pos": 1, "path": "po.billTo.city" },
+            { "pos": 2, "path": "po.billTo.state" },
+            { "pos": 3, "path": "po.billTo.zip" }
+          ]
+        }
+      ]
+    },
+    {
+      "loop": "lines",
+      "over": "po.lines",
+      "segments": [
+        {
+          "segment": "PO1",
+          "elements": [
+            { "pos": 1, "path": "$item.line" },
+            { "pos": 2, "path": "$item.qty" },
+            { "pos": 3, "path": "$item.uom", "default": "EA" },
+            { "pos": 4, "path": "$item.price", "decimal": 2 },
+            { "pos": 7, "path": "$item.buyerPart", "qualifier": { "pos": 6, "const": "BP" } },
+            { "pos": 9, "path": "$item.vendorPart", "qualifier": { "pos": 8, "const": "VN" } }
+          ]
+        },
+        {
+          "segment": "PID",
+          "elements": [
+            { "pos": 1, "const": "F" },
+            { "pos": 5, "path": "$item.description" }
+          ]
+        },
+        {
+          "segment": "TD5",
+          "when": "po.routing",
+          "$comment": "Replaces is_td5/inc_td5: placement is just position in the line loop.",
+          "elements": [
+            { "pos": 4, "path": "po.routing.method" },
+            { "pos": 5, "path": "po.routing.carrier" }
+          ]
+        }
+      ]
+    },
+    {
+      "segment": "CTT",
+      "when": "config.includeCtt",
+      "$comment": "Replaces is_ctt.",
+      "elements": [ { "pos": 1, "count": "po.lines" } ]
+    }
+  ]
+}

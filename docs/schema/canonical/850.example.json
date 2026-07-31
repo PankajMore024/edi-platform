@@ -1,0 +1,31 @@
+{
+  "$comment": "Business 850 (Purchase Order), from coreapp $eA for an EMRY order (kon_850lists id 306583). Shown here as a SEND example (buyer/retailer role -> product builds outbound X12). The IDENTICAL shape is what a SUPPLIER-role client RECEIVES (product parses inbound X12 -> this, plus a populated `_meta`). Validates against 850.schema.json.",
+  "partnerKey": "EMRY",
+  "poNumber": "EMRY-49304",
+  "orderId": "10632615",
+  "poDate": "2026-06-06",
+  "orderDate": "2026-05-31",
+  "shipTo": {
+    "name": "Anthony McDonald",
+    "phone": "416 436-6177",
+    "address": {
+      "address1": "38 St Johns Place",
+      "city": "Freeport",
+      "state": "NY",
+      "zip": "11520",
+      "country": "US"
+    }
+  },
+  "lines": [
+    {
+      "qty": 1,
+      "sku": "EMRY-6007624",
+      "vendorItem": "6007624",
+      "unitCost": 22.19,
+      "shippingPrice": 0,
+      "title": "RUG MORNING SONG BIRDS (Pack of 1)",
+      "carrier": "FedEx",
+      "service": "Ground"
+    }
+  ]
+}

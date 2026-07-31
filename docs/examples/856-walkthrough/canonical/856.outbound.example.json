@@ -1,0 +1,77 @@
+{
+  "$comment": "Canonical, X12-agnostic 856 (Advance Ship Notice) business document. This is the ONLY thing a customer's application produces. No HL numbers, no segment tags, no qualifiers, no parent pointers — those are the engine's job. One shipment, one PO, two cartons, one item per carton.",
+  "shipment": {
+    "shipmentId": "SHIP-55001",
+    "purpose": "00",
+    "date": "2026-06-15",
+    "time": "1430",
+    "weight": { "value": 42.5, "uom": "LB" },
+    "carrier": {
+      "scac": "UPSN",
+      "method": "M",
+      "routingDescription": "UPS GROUND",
+      "trackingNumber": "1Z999AA10123456784"
+    },
+    "billOfLading": "BOL-99",
+    "references": [
+      { "qualifier": "BM", "value": "BOL-99" },
+      { "qualifier": "CN", "value": "1Z999AA10123456784" }
+    ],
+    "shipFrom": {
+      "name": "Acme Distribution Center",
+      "id": "DC1",
+      "address1": "100 Warehouse Rd",
+      "city": "Memphis",
+      "state": "TN",
+      "zip": "38118",
+      "country": "US"
+    },
+    "shipTo": {
+      "name": "Retailer Store 12",
+      "id": "STORE12",
+      "address1": "1 Main St",
+      "city": "Austin",
+      "state": "TX",
+      "zip": "78701",
+      "country": "US"
+    },
+    "orders": [
+      {
+        "poNumber": "PO-10001",
+        "poDate": "2026-06-07",
+        "packs": [
+          {
+            "sscc": "00000123450000000018",
+            "packagingType": "CTN25",
+            "items": [
+              {
+                "buyerPart": "B-1",
+                "vendorPart": "V-1",
+                "upc": "00012345600012",
+                "qtyShipped": 10,
+                "qtyOrdered": 10,
+                "uom": "EA",
+                "description": "Blue Widget"
+              }
+            ]
+          },
+          {
+            "sscc": "00000123450000000025",
+            "packagingType": "CTN25",
+            "items": [
+              {
+                "buyerPart": "B-2",
+                "vendorPart": "V-2",
+                "upc": "00012345600029",
+                "qtyShipped": 5,
+                "qtyOrdered": 5,
+                "uom": "EA",
+                "description": "Red Widget"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

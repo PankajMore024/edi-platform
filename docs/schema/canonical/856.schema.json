@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://koneect.local/schema/canonical/856.schema.json",
+  "title": "Canonical 856 (Advance Ship Notice) — business document, direction-NEUTRAL",
+  "description": "A shipment's business facts. Product INPUT when the client SENDS an 856 (supplier role -> build outbound X12 with engine-managed HL hierarchy, see docs/examples/856-walkthrough/), product OUTPUT when the client RECEIVES an 856 (buyer role -> parse inbound, rebuild the order/pack/item tree from HL pointers). The client never authors HL numbers, parent links, or segment codes — that is the engine's job. `_meta` populated only on inbound.",
+  "type": "object",
+  "required": ["partnerKey", "shipment"],
+  "additionalProperties": false,
+  "properties": {
+    "partnerKey": { "type": "string", "description": "The partner on the other side; selects map + config." },
+    "shipment": {
+      "type": "object",
+      "required": ["shipmentId", "orders"],
+      "additionalProperties": false,
+      "properties": {
+        "shipmentId": { "type": "string", "description": "BSN02." },
+        "purpose": { "type": "string", "default": "00", "description": "BSN01." },
+        "date": { "type": "string", "format": "date", "description": "BSN03." },
+        "time": { "type": "string", "description": "BSN04 (HHMM/HHMMSS)." },
+        "weight": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": ["number", "string"] },
+            "uom": { "type": "string", "default": "LB" }
+          }
+        },
+        "carrier": {
+          "type": "object",
+          "description": "Business carrier facts; map resolves to TD5 qualifiers/SCAC.",
+          "additionalProperties": false,
+          "properties": {
+            "scac": { "type": "string" },
+            "method": { "type": "string" },
+            "routingDescription": { "type": "string" },
+            "trackingNumber": { "type": "string" }
+          }
+        },
+        "shipFrom": { "$ref": "#/definitions/namedParty" },
+        "shipTo": { "$ref": "#/definitions/namedParty" },
+        "references": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/typedValue" } },
+        "orders": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Order (HL=O) level. The hierarchy is business nesting; engine emits HL numbering.",
+          "items": {
+            "type": "object",
+            "required": ["poNumber", "packs"],
+            "additionalProperties": false,
+            "properties": {
+              "poNumber": { "type": "string", "description": "PRF01." },
+              "poDate": { "type": "string", "format": "date" },
+              "packs": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Pack/Tare (HL=P) level — one per carton.",
+                "items": {
+                  "type": "object",
+                  "required": ["items"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "sscc": { "type": "string", "description": "Carton/SSCC or tracking id -> MAN. Real EMRY data uses MAN01=CP + tracking, not GM/SSCC-18." },
+                    "markType": { "type": "string", "default": "GM", "description": "MAN01: GM=SSCC-18, CP=carrier pack id, etc. Partner-specific; may move to map." },
+                    "packagingType": { "type": "string", "description": "e.g. CTN." },
+                    "items": {
+                      "type": "array",
+                      "minItems": 1,
+                      "description": "Item (HL=I) level.",
+                      "items": {
+                        "type": "object",
+                        "required": ["qtyShipped"],
+                        "additionalProperties": false,
+                        "properties": {
+                          "sku": { "type": "string" },
+                          "vendorItem": { "type": "string", "description": "LIN VN." },
+                          "upc": { "type": "string", "description": "LIN UP." },
+                          "qtyShipped": { "type": ["number", "string"], "description": "SN102." },
+                          "qtyOrdered": { "type": ["number", "string"], "description": "SN105." },
+                          "uom": { "type": "string", "default": "EA" },
+                          "title": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "extensions": { "type": "object", "additionalProperties": true },
+    "_meta": { "$ref": "common.schema.json#/definitions/inboundMeta" }
+  },
+  "definitions": {
+    "namedParty": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "id": { "type": "string" },
+        "address": { "$ref": "common.schema.json#/definitions/address" }
+      }
+    }
+  }
+}

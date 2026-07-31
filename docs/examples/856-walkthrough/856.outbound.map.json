@@ -1,0 +1,181 @@
+{
+  "$comment": "LAYER B — Partner declarative map for (EXAMPLE_CO, 856, outbound). Everything partner-specific is DATA here. Note: 856 introduces exactly ONE new node type beyond the frozen 850 DSL — the `hl` node — because the HL hierarchy (auto-numbered HL01, parent-pointer HL02, child-flag HL04) cannot be expressed with flat segment/loop nodes. This is the first justified DSL extension since D6. See README.md and engine-notes.md.",
+  "partner": "EXAMPLE_CO",
+  "docType": "856",
+  "direction": "outbound",
+  "functionalId": "SH",
+  "version": "004010",
+  "structure": [
+    {
+      "segment": "BSN",
+      "elements": [
+        { "pos": 1, "path": "shipment.purpose", "default": "00" },
+        { "pos": 2, "path": "shipment.shipmentId" },
+        { "pos": 3, "path": "shipment.date", "format": "CCYYMMDD" },
+        { "pos": 4, "path": "shipment.time", "format": "HHMM" },
+        { "pos": 5, "const": "0001", "$comment": "Hierarchical structure code 0001 = Shipment/Order/Pack/Item. It is a CONTRACT between this map and the hl-tree below; partner-specific." }
+      ]
+    },
+    {
+      "hl": "S",
+      "over": "shipment",
+      "$comment": "SHIPMENT level. `over` an object iterates once; $item = shipment. Engine emits HL*1**S*1 automatically.",
+      "segments": [
+        {
+          "segment": "TD1",
+          "when": "$item.weight",
+          "elements": [
+            { "pos": 1, "path": "$item.packagingTypeSummary", "default": "CTN25" },
+            { "pos": 6, "const": "G", "$comment": "weight qualifier: Gross" },
+            { "pos": 7, "path": "$item.weight.value", "decimal": 1 },
+            { "pos": 8, "path": "$item.weight.uom", "default": "LB" }
+          ]
+        },
+        {
+          "segment": "TD5",
+          "when": "$item.carrier",
+          "elements": [
+            { "pos": 1, "const": "B", "$comment": "routing seq = origin/delivery carrier" },
+            { "pos": 2, "const": "2", "$comment": "id qualifier 2 = SCAC" },
+            { "pos": 3, "path": "$item.carrier.scac" },
+            { "pos": 4, "path": "$item.carrier.method", "default": "M" },
+            { "pos": 5, "path": "$item.carrier.routingDescription" }
+          ]
+        },
+        {
+          "segment": "REF",
+          "over": "$item.references",
+          "when": "$item.references",
+          "elements": [
+            { "pos": 1, "path": "$item.qualifier" },
+            { "pos": 2, "path": "$item.value" }
+          ]
+        },
+        {
+          "loop": "shipTo",
+          "segments": [
+            {
+              "segment": "N1",
+              "elements": [
+                { "pos": 1, "const": "ST" },
+                { "pos": 2, "path": "$item.shipTo.name" },
+                { "pos": 3, "const": "92", "$comment": "id qualifier 92 = assigned by buyer" },
+                { "pos": 4, "path": "$item.shipTo.id" }
+              ]
+            },
+            { "segment": "N3", "elements": [ { "pos": 1, "path": "$item.shipTo.address1" } ] },
+            {
+              "segment": "N4",
+              "elements": [
+                { "pos": 1, "path": "$item.shipTo.city" },
+                { "pos": 2, "path": "$item.shipTo.state" },
+                { "pos": 3, "path": "$item.shipTo.zip" },
+                { "pos": 4, "path": "$item.shipTo.country", "default": "US" }
+              ]
+            }
+          ]
+        },
+        {
+          "loop": "shipFrom",
+          "when": "$item.shipFrom",
+          "segments": [
+            {
+              "segment": "N1",
+              "elements": [
+                { "pos": 1, "const": "SF" },
+                { "pos": 2, "path": "$item.shipFrom.name" },
+                { "pos": 3, "const": "92" },
+                { "pos": 4, "path": "$item.shipFrom.id" }
+              ]
+            },
+            { "segment": "N3", "elements": [ { "pos": 1, "path": "$item.shipFrom.address1" } ] },
+            {
+              "segment": "N4",
+              "elements": [
+                { "pos": 1, "path": "$item.shipFrom.city" },
+                { "pos": 2, "path": "$item.shipFrom.state" },
+                { "pos": 3, "path": "$item.shipFrom.zip" },
+                { "pos": 4, "path": "$item.shipFrom.country", "default": "US" }
+              ]
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "hl": "O",
+          "over": "$item.orders",
+          "$comment": "ORDER level. $item = each order. Engine sets HL02 = parent shipment's HL01.",
+          "segments": [
+            {
+              "segment": "PRF",
+              "elements": [
+                { "pos": 1, "path": "$item.poNumber" },
+                { "pos": 4, "path": "$item.poDate", "format": "CCYYMMDD" }
+              ]
+            }
+          ],
+          "children": [
+            {
+              "hl": "P",
+              "over": "$item.packs",
+              "$comment": "PACK/TARE level. One per carton. MAN carries the SSCC-18 barcode.",
+              "segments": [
+                {
+                  "segment": "MAN",
+                  "when": "$item.sscc",
+                  "elements": [
+                    { "pos": 1, "const": "GM", "$comment": "GM = SSCC-18 / GS1-128" },
+                    { "pos": 2, "path": "$item.sscc" }
+                  ]
+                }
+              ],
+              "children": [
+                {
+                  "hl": "I",
+                  "over": "$item.items",
+                  "$comment": "ITEM level. Leaf — no children, so engine sets HL04 = 0.",
+                  "segments": [
+                    {
+                      "segment": "LIN",
+                      "elements": [
+                        { "pos": 2, "const": "UP" },
+                        { "pos": 3, "path": "$item.upc" },
+                        { "pos": 4, "const": "VN" },
+                        { "pos": 5, "path": "$item.vendorPart" },
+                        { "pos": 6, "const": "BP" },
+                        { "pos": 7, "path": "$item.buyerPart" }
+                      ]
+                    },
+                    {
+                      "segment": "SN1",
+                      "elements": [
+                        { "pos": 2, "path": "$item.qtyShipped" },
+                        { "pos": 3, "path": "$item.uom", "default": "EA" },
+                        { "pos": 5, "path": "$item.qtyOrdered" }
+                      ]
+                    },
+                    {
+                      "segment": "PID",
+                      "when": "$item.description",
+                      "elements": [
+                        { "pos": 1, "const": "F" },
+                        { "pos": 5, "path": "$item.description" }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "segment": "CTT",
+      "elements": [
+        { "pos": 1, "count": "$hlSegments", "$comment": "CTT01 for 856 = number of HL segments emitted. `$hlSegments` is an engine-derived token, not a canonical array path." }
+      ]
+    }
+  ]
+}

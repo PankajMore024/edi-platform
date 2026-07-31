@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://koneect.local/schema/canonical/common.schema.json",
+  "title": "Canonical shared components",
+  "description": "Reusable sub-objects $ref'd by every canonical doc (in or out). Separate documents, shared parts (see context.md D9).",
+  "definitions": {
+    "typedValue": {
+      "type": "object",
+      "description": "Models any qualifier-coded element (REF, DTM, etc.) as data, so new qualifiers need no schema change.",
+      "required": ["type", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "description": "Business meaning or raw X12 qualifier (e.g. 'DP', 'requested_ship')." },
+        "value": { "type": ["string", "number"] }
+      }
+    },
+    "address": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "address1": { "type": "string" },
+        "address2": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "country": { "type": "string", "default": "US" }
+      }
+    },
+    "party": {
+      "type": "object",
+      "description": "An N1 loop: who, in what role, optionally identified.",
+      "required": ["role"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string", "description": "X12 entity-identifier code, e.g. ST (ship-to), BT (bill-to), VN (vendor)." },
+        "name": { "type": "string" },
+        "idQualifier": { "type": "string" },
+        "id": { "type": "string" },
+        "address": { "$ref": "#/definitions/address" },
+        "contact": { "$ref": "#/definitions/contact" }
+      }
+    },
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" }
+      }
+    },
+    "charge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "description": "e.g. freight, handling, discount." },
+        "amount": { "type": "number" }
+      }
+    },
+    "lineItem": {
+      "type": "object",
+      "required": ["line", "qty"],
+      "additionalProperties": false,
+      "properties": {
+        "line": { "type": "integer", "minimum": 1 },
+        "qty": { "type": "number" },
+        "uom": { "type": "string", "default": "EA" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "ids": {
+          "type": "array",
+          "description": "Product identifiers as typed values: BP (buyer part), VN (vendor part), UP (UPC), etc.",
+          "items": { "$ref": "#/definitions/typedValue" }
+        },
+        "references": { "type": "array", "items": { "$ref": "#/definitions/typedValue" } },
+        "dates": { "type": "array", "items": { "$ref": "#/definitions/typedValue" } }
+      }
+    },
+    "inboundMeta": {
+      "type": "object",
+      "description": "Receipt/provenance — present ONLY when a doc was RECEIVED (parsed), regardless of doc type. Decouples direction from the business shape: the same business doc gains this envelope on inbound, and omits it on outbound (where the envelope layer assigns control numbers). See README.md.",
+      "additionalProperties": false,
+      "properties": {
+        "partner": { "type": "string" },
+        "fileName": { "type": "string" },
+        "receivedAt": { "type": "string", "format": "date-time" },
+        "controlNumbers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "isa13": { "type": "string" },
+            "gs06": { "type": "string" },
+            "st02": { "type": "string" }
+          }
+        },
+        "unmapped": {
+          "type": "array",
+          "description": "Segments/elements received with no canonical home — captured, never dropped (inbound counterpart of extensions).",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "segment": { "type": "string" },
+              "elements": { "type": "array", "items": { "type": ["string", "number"] } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

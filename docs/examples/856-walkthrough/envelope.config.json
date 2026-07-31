@@ -1,0 +1,37 @@
+{
+  "$comment": "LAYER A — Envelope config. This already exists in production today as kon_x12settings + ediTemplateParser.js. It is partner-agnostic plumbing: who/how to address and frame the interchange. It NEVER changes per doc type's body. Shown here only so the 856 walkthrough is self-contained.",
+  "partner": "EXAMPLE_CO",
+  "interchange": {
+    "authQualifier": "00",
+    "authInfo": "",
+    "securityQualifier": "00",
+    "securityInfo": "",
+    "senderQualifier": "ZZ",
+    "senderId": "ACMEEDI",
+    "receiverQualifier": "ZZ",
+    "receiverId": "RETAILEREDI",
+    "usageIndicator": "P",
+    "componentSeparator": ">",
+    "repetitionSeparator": "U"
+  },
+  "delimiters": {
+    "element": "*",
+    "segment": "~",
+    "subElement": ">"
+  },
+  "controlNumbers": {
+    "$comment": "Engine-assigned at send time from the sequence store; shown as samples.",
+    "isaControl": "000000001",
+    "gsControl": "1",
+    "stControl": "0001"
+  },
+  "group": {
+    "functionalId": "SH",
+    "version": "004010"
+  },
+  "transport": {
+    "mode": "P",
+    "protocol": "SFTP",
+    "outboundPath": "/edi/out/856/"
+  }
+}

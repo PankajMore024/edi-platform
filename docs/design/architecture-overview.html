@@ -1,0 +1,804 @@
+<title>EDI Platform — Architecture Overview</title>
+<style>
+  :root {
+    --paper: #eef1f5;
+    --surface: #f8fafc;
+    --surface-2: #ffffff;
+    --ink: #111820;
+    --ink-soft: #3a4653;
+    --muted: #64707e;
+    --line: #d3dae3;
+    --line-soft: #e2e8ef;
+    --teal: #0b8073;      /* partner edge / primary accent */
+    --teal-bright: #10a596;
+    --teal-tint: #e3f1ef;
+    --amber: #a86e12;     /* customer edge */
+    --amber-tint: #f3ebda;
+    --hub: #111820;
+    --star: #b4791b;
+    --shadow: 0 1px 2px rgba(17,24,32,.05), 0 8px 24px -12px rgba(17,24,32,.18);
+    --radius: 10px;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Monaco, "Cascadia Code", Consolas, monospace;
+    --measure: 68ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0b1016;
+      --surface: #10171f;
+      --surface-2: #131c25;
+      --ink: #e7edf3;
+      --ink-soft: #b7c2cd;
+      --muted: #8695a3;
+      --line: #263441;
+      --line-soft: #1c2833;
+      --teal: #21c3b0;
+      --teal-bright: #35d6c3;
+      --teal-tint: #10312e;
+      --amber: #d29a3f;
+      --amber-tint: #2c2415;
+      --hub: #e7edf3;
+      --star: #e0ad55;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f5; --surface: #f8fafc; --surface-2: #ffffff; --ink: #111820; --ink-soft: #3a4653;
+    --muted: #64707e; --line: #d3dae3; --line-soft: #e2e8ef; --teal: #0b8073; --teal-bright: #10a596;
+    --teal-tint: #e3f1ef; --amber: #a86e12; --amber-tint: #f3ebda; --hub: #111820; --star: #b4791b;
+    --shadow: 0 1px 2px rgba(17,24,32,.05), 0 8px 24px -12px rgba(17,24,32,.18);
+  }
+  :root[data-theme="dark"] {
+    --paper: #0b1016; --surface: #10171f; --surface-2: #131c25; --ink: #e7edf3; --ink-soft: #b7c2cd;
+    --muted: #8695a3; --line: #263441; --line-soft: #1c2833; --teal: #21c3b0; --teal-bright: #35d6c3;
+    --teal-tint: #10312e; --amber: #d29a3f; --amber-tint: #2c2415; --hub: #e7edf3; --star: #e0ad55;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
+  }
+
+  /* semantic status colors (legible on both grounds) */
+  :root { --good: #22a06f; --warn: #b07d16; --crit: #c0492f; }
+  @media (prefers-color-scheme: dark) { :root { --good: #4cc38a; --warn: #d29a3f; --crit: #e06a4e; } }
+  :root[data-theme="light"] { --good: #22a06f; --warn: #b07d16; --crit: #c0492f; }
+  :root[data-theme="dark"] { --good: #4cc38a; --warn: #d29a3f; --crit: #e06a4e; }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- typography ---------- */
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--teal); font-weight: 600; margin: 0 0 12px;
+  }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.12; margin: 0; }
+  h1 { font-size: clamp(2rem, 5.2vw, 3.3rem); font-weight: 800; letter-spacing: -.02em; }
+  h2 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 750; letter-spacing: -.015em; }
+  h3 { font-size: 1.06rem; font-weight: 700; letter-spacing: -.01em; }
+  p { margin: 0; max-width: var(--measure); }
+  .lead { font-size: clamp(1.05rem, 2vw, 1.22rem); color: var(--ink-soft); line-height: 1.55; }
+  code, .mono { font-family: var(--mono); }
+  .code-inline {
+    font-family: var(--mono); font-size: .86em; background: var(--surface);
+    border: 1px solid var(--line-soft); border-radius: 5px; padding: .08em .38em; color: var(--ink-soft);
+  }
+
+  /* ---------- header ---------- */
+  header.top { border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 82%, transparent); backdrop-filter: blur(6px); position: sticky; top: 0; z-index: 20; }
+  .top-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 24px; max-width: 1120px; margin: 0 auto; }
+  .brand { font-family: var(--mono); font-weight: 600; letter-spacing: .04em; font-size: .82rem; display: flex; align-items: center; gap: 10px; }
+  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 3px var(--teal-tint); }
+  .top-nav { display: flex; gap: 20px; font-family: var(--mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
+  .top-nav a { color: var(--muted); text-decoration: none; transition: color .15s; }
+  .top-nav a:hover { color: var(--teal); }
+  @media (max-width: 720px) { .top-nav { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 72px 0 40px; }
+  .hero h1 { max-width: 16ch; }
+  .hero .lead { margin-top: 20px; }
+  .rule-cap { display: inline-flex; align-items: center; gap: 10px; margin-top: 28px; font-family: var(--mono); font-size: .78rem; color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: 7px; padding: 10px 14px; max-width: var(--measure); line-height: 1.4; }
+  .rule-cap b { color: var(--ink); }
+
+  /* ---------- vision ---------- */
+  .pitch-wrap { border-left: 4px solid var(--teal); padding: 4px 0 4px 22px; margin: 4px 0 28px; }
+  .pitch { font-size: clamp(1.5rem, 3.6vw, 2.35rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.18; max-width: 24ch; margin: 0; }
+  .pitch .q { color: var(--teal); }
+
+  /* ---------- onboarding loop ---------- */
+  .loop { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+  .loop-step { flex: 1 0 158px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 5px; }
+  .loop-step .ls-num { font-family: var(--mono); font-size: .66rem; color: var(--teal); font-weight: 700; letter-spacing: .08em; }
+  .loop-step .ls-t { font-weight: 750; font-size: .95rem; }
+  .loop-step .ls-d { font-size: .8rem; color: var(--muted); line-height: 1.42; }
+  .loop-arrow { align-self: center; color: var(--teal); font-size: 1.05rem; padding: 0 7px; flex: 0 0 auto; }
+  .loop-repeat { margin-top: 12px; font-family: var(--mono); font-size: .74rem; color: var(--teal); }
+
+  /* ---------- live status ---------- */
+  .num { font-variant-numeric: tabular-nums; }
+  .pill { font-family: var(--mono); font-size: .68rem; font-weight: 600; padding: 3px 9px; border-radius: 20px; display: inline-block; letter-spacing: .02em; white-space: nowrap; }
+  .pill.good { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .pill.warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+  .pill.crit { background: color-mix(in srgb, var(--crit) 16%, transparent); color: var(--crit); }
+  .mini-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .mini-cols { grid-template-columns: 1fr; } }
+
+  /* ---------- section scaffold ---------- */
+  section { padding: 46px 0; border-top: 1px solid var(--line); }
+  .sec-head { margin-bottom: 30px; }
+  .sec-head p { color: var(--muted); margin-top: 10px; }
+
+  /* ---------- flow diagram ---------- */
+  .flow {
+    display: grid; grid-template-columns: 1fr auto 1.25fr auto 1fr; align-items: stretch; gap: 0;
+    margin: 8px 0 22px;
+  }
+  .node {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; min-height: 128px; justify-content: center;
+  }
+  .node .n-label { font-family: var(--mono); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .node .n-title { font-weight: 750; font-size: 1.02rem; letter-spacing: -.01em; }
+  .node .n-sub { font-size: .84rem; color: var(--muted); line-height: 1.4; }
+  .node.customer { border-top: 3px solid var(--amber); }
+  .node.partner  { border-top: 3px solid var(--teal); }
+  .node.hub {
+    border: 1.5px solid var(--hub); background: var(--ink); color: var(--surface-2);
+    align-items: center; text-align: center;
+  }
+  :root[data-theme="dark"] .node.hub, .node.hub { }
+  @media (prefers-color-scheme: dark) { .node.hub { background: #060b10; color: var(--ink); border-color: var(--teal); } }
+  :root[data-theme="dark"] .node.hub { background: #060b10; color: var(--ink); border-color: var(--teal); }
+  :root[data-theme="light"] .node.hub { background: var(--ink); color: #f8fafc; border-color: var(--ink); }
+  .node.hub .n-label { color: var(--teal-bright); }
+  .node.hub .n-title { font-size: 1.1rem; }
+  .node.hub .docs { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-top: 6px; }
+  .node.hub .docs span { font-family: var(--mono); font-size: .72rem; padding: 2px 7px; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--teal-bright) 45%, transparent); color: var(--teal-bright); }
+
+  .link { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 10px; min-width: 96px; }
+  .link .arrows { font-size: 1.3rem; color: var(--teal); line-height: 1; letter-spacing: -2px; }
+  .link .l-label { font-family: var(--mono); font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: center; margin-top: 6px; line-height: 1.3; }
+  .link.cust .arrows { color: var(--amber); }
+
+  .services-strip {
+    border: 1px dashed var(--line); border-radius: var(--radius); padding: 14px 16px;
+    display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; background: color-mix(in srgb, var(--surface) 60%, transparent);
+  }
+  .services-strip .st-label { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+  .chip { font-family: var(--mono); font-size: .72rem; padding: 3px 9px; border-radius: 20px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-soft); }
+
+  @media (max-width: 800px) {
+    .flow { grid-template-columns: 1fr; }
+    .link { flex-direction: row; gap: 10px; min-width: 0; padding: 8px 0; }
+    .link .arrows { transform: rotate(90deg); }
+    .link .l-label { margin-top: 0; text-align: left; }
+  }
+
+  /* ---------- primitives ---------- */
+  .prim-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .prim { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+  .prim .p-name { font-family: var(--mono); font-weight: 600; font-size: .84rem; color: var(--teal); letter-spacing: .02em; }
+  .prim .p-dir { margin-top: 6px; font-size: .95rem; color: var(--ink-soft); }
+  .prim .p-dir b { color: var(--ink); }
+  @media (max-width: 640px) { .prim-grid { grid-template-columns: 1fr; } }
+
+  /* ---------- wiring (sequential) ---------- */
+  .wiring { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 22px; }
+  .seat { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  .seat h3 { display: flex; align-items: baseline; gap: 8px; }
+  .seat .tag { font-family: var(--mono); font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border-radius: 5px; }
+  .seat.sell .tag { background: var(--teal-tint); color: var(--teal); }
+  .seat.buy .tag { background: var(--amber-tint); color: var(--amber); }
+  .seat p.note { color: var(--muted); font-size: .88rem; margin: 6px 0 14px; }
+  .steps { display: flex; flex-direction: column; gap: 8px; }
+  .step { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; font-size: .9rem; }
+  .step .mono-op { font-family: var(--mono); font-size: .72rem; color: var(--teal); border: 1px solid var(--line); border-radius: 5px; padding: 3px 7px; white-space: nowrap; background: var(--surface); }
+  .step .txt { color: var(--ink-soft); }
+  .step .txt b { color: var(--ink); font-weight: 650; }
+  @media (max-width: 720px) { .wiring { grid-template-columns: 1fr; } }
+
+  /* ---------- generic cards / grids ---------- */
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (max-width: 860px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+  .card { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 16px; box-shadow: var(--shadow); transition: transform .15s ease, border-color .15s ease; }
+  .card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--teal) 40%, var(--line)); }
+  .card h3 { font-size: .98rem; }
+  .card p { font-size: .88rem; color: var(--muted); margin-top: 6px; }
+  .phasetag { font-family: var(--mono); font-size: .64rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 20px; padding: 2px 8px; }
+
+  /* ---------- tables ---------- */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; min-width: 520px; background: var(--surface-2); }
+  thead th { font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); font-weight: 600; background: var(--surface); }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; color: var(--ink-soft); }
+  tbody tr:last-child td { border-bottom: none; }
+  td .doc-code { font-family: var(--mono); font-weight: 650; color: var(--teal); }
+  td b { color: var(--ink); font-weight: 650; }
+  .yes { color: var(--teal); font-weight: 650; }
+  .later { color: var(--muted); }
+
+  /* ---------- db schema ---------- */
+  .db-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (max-width: 720px) { .db-grid { grid-template-columns: 1fr; } }
+  .db-group { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+  .db-group h3 { font-family: var(--mono); font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--teal); margin-bottom: 12px; }
+  .db-list { display: flex; flex-direction: column; gap: 9px; }
+  .db-row { display: grid; grid-template-columns: auto 1fr; gap: 9px; align-items: baseline; }
+  .tbl-name { font-family: var(--mono); font-size: .82rem; color: var(--ink); font-weight: 600; }
+  .db-row .desc { font-size: .82rem; color: var(--muted); }
+  .core { color: var(--star); font-weight: 700; }
+  .db-legend { display: flex; gap: 18px; font-family: var(--mono); font-size: .72rem; color: var(--muted); margin-top: 14px; flex-wrap: wrap; }
+
+  /* ---------- journey ---------- */
+  .journey { display: flex; flex-direction: column; gap: 2px; counter-reset: j; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  .j-step { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; padding: 13px 16px; background: var(--surface-2); border-bottom: 1px solid var(--line-soft); }
+  .j-step:last-child { border-bottom: none; }
+  .j-step .num { counter-increment: j; font-family: var(--mono); font-weight: 700; color: var(--teal); }
+  .j-step .num::before { content: counter(j, decimal-leading-zero); }
+  .j-step .body { font-size: .92rem; color: var(--ink-soft); }
+  .j-step .body b { color: var(--ink); }
+  .j-step .svc { font-family: var(--mono); font-size: .7rem; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 3px 8px; white-space: nowrap; }
+  @media (max-width: 640px) { .j-step { grid-template-columns: 30px 1fr; } .j-step .svc { display: none; } }
+
+  /* ---------- phases ---------- */
+  .phases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; counter-reset: ph; }
+  .phase { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 14px; box-shadow: var(--shadow); position: relative; display: flex; flex-direction: column; gap: 8px; }
+  .phase .ph-num { font-family: var(--mono); font-size: .72rem; font-weight: 700; letter-spacing: .06em; color: var(--teal); }
+  .phase.now { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), var(--shadow); }
+  .phase.now .ph-num::after { content: " · NOW"; color: var(--teal); }
+  .phase .ph-adds { font-weight: 700; font-size: .92rem; letter-spacing: -.01em; }
+  .phase .ph-out { font-size: .8rem; color: var(--muted); line-height: 1.4; }
+  @media (max-width: 900px) { .phases { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px) { .phases { grid-template-columns: 1fr; } }
+
+  /* ---------- remember ---------- */
+  .remember { background: var(--ink); color: var(--surface-2); border-radius: 14px; padding: 34px 30px; margin-top: 10px; }
+  :root[data-theme="dark"] .remember { background: #060b10; border: 1px solid var(--line); }
+  @media (prefers-color-scheme: dark) { .remember { background: #060b10; border: 1px solid var(--line); } }
+  :root[data-theme="light"] .remember { background: var(--ink); border: none; }
+  .remember .eyebrow { color: var(--teal-bright); }
+  .remember h2 { color: #f8fafc; }
+  :root[data-theme="dark"] .remember h2 { color: var(--ink); }
+  @media (prefers-color-scheme: dark) { .remember h2 { color: var(--ink); } }
+  :root[data-theme="light"] .remember h2 { color: #f8fafc; }
+  .r-list { list-style: none; padding: 0; margin: 22px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; counter-reset: r; }
+  .r-list li { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+  .r-list li .rn { counter-increment: r; font-family: var(--mono); font-weight: 700; color: var(--teal-bright); font-size: .9rem; }
+  .r-list li .rn::before { content: counter(r); }
+  .r-list li .rt { font-size: .92rem; line-height: 1.45; color: color-mix(in srgb, #f8fafc 82%, transparent); }
+  :root[data-theme="dark"] .r-list li .rt { color: var(--ink-soft); }
+  @media (prefers-color-scheme: dark) { .r-list li .rt { color: var(--ink-soft); } }
+  :root[data-theme="light"] .r-list li .rt { color: color-mix(in srgb, #f8fafc 82%, transparent); }
+  .r-list li .rt b { color: #fff; }
+  :root[data-theme="dark"] .r-list li .rt b { color: var(--ink); }
+
+  footer { padding: 40px 0 60px; color: var(--muted); font-family: var(--mono); font-size: .74rem; border-top: 1px solid var(--line); }
+
+  a.anchor { color: inherit; text-decoration: none; }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><span class="dot"></span> EDI&nbsp;PLATFORM · ARCHITECTURE v1</div>
+    <nav class="top-nav">
+      <a href="#vision">Vision</a>
+      <a href="#engine">Engine</a>
+      <a href="#mappings">Mappings</a>
+      <a href="#services">Services</a>
+      <a href="#onboarding">Onboarding</a>
+      <a href="#livedata">Live&nbsp;Data</a>
+      <a href="#schema">Schema</a>
+      <a href="#phases">Phases</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- HERO -->
+    <section class="hero" style="border-top:none;">
+      <p class="eyebrow">Architecture Overview</p>
+      <h1>One engine. Two worlds. A universal document in the middle.</h1>
+      <p class="lead">The platform translates business documents between the <b>customer’s world</b>
+        (Shopify, QuickBooks, a CSV, their DB) and the <b>partner’s world</b> (Walmart, Target, big
+        vendors) that demands EDI. Everything translates to and from one invented format — the
+        <b>canonical</b> document. That single idea keeps the rest simple.</p>
+
+      <div class="flow" role="img" aria-label="Customer world connects through connectors to the canonical hub, which connects through partner maps to the partner world">
+        <div class="node customer">
+          <span class="n-label">Customer’s world</span>
+          <span class="n-title">Shopify · QuickBooks · CSV · DB</span>
+          <span class="n-sub">Where our customer already works.</span>
+        </div>
+        <div class="link cust">
+          <span class="arrows">⇄</span>
+          <span class="l-label">connector<br>maps</span>
+        </div>
+        <div class="node hub">
+          <span class="n-label">Canonical hub</span>
+          <span class="n-title">Universal business document</span>
+          <div class="docs"><span>850</span><span>855</span><span>856</span><span>810</span><span>846</span><span>997</span></div>
+        </div>
+        <div class="link">
+          <span class="arrows">⇄</span>
+          <span class="l-label">partner<br>maps (X12)</span>
+        </div>
+        <div class="node partner">
+          <span class="n-label">Partner’s world</span>
+          <span class="n-title">Walmart · Target · vendors</span>
+          <span class="n-sub">Speaks EDI (X12). The mandate.</span>
+        </div>
+      </div>
+
+      <div class="services-strip">
+        <span class="st-label">underneath ▸</span>
+        <span class="chip">registry / templates</span>
+        <span class="chip">reference data</span>
+        <span class="chip">control numbers</span>
+        <span class="chip">secrets vault</span>
+        <span class="chip">raw store</span>
+        <span class="chip">validation</span>
+        <span class="chip">workflow</span>
+        <span class="chip">observability</span>
+        <span class="chip">tenancy / RBAC</span>
+        <span class="chip">sandbox + AI onboarding</span>
+      </div>
+
+      <div class="rule-cap">
+        <span class="mono" style="color:var(--teal);font-weight:700;">RULE&nbsp;01</span>
+        <span>Partners, versions, and formats are <b>data (maps &amp; config) — never code.</b>
+          You never change the engine to add a partner. You add a map.</span>
+      </div>
+    </section>
+
+    <!-- VISION -->
+    <section id="vision">
+      <div class="sec-head">
+        <p class="eyebrow">Vision · why this wins</p>
+        <h2>The scary part disappears — for a seat nobody serves well</h2>
+        <p>We sell into the most proven pain in EDI: the moment a big partner forces a small business
+          onto EDI, and the deal is on hold until they’re compliant.</p>
+      </div>
+
+      <div class="pitch-wrap">
+        <p class="pitch">Keep your spreadsheet. <span class="q">We speak EDI to your big partners for you.</span></p>
+      </div>
+
+      <div class="grid-2">
+        <div class="card" style="border-top:3px solid var(--teal);">
+          <h3>The wedge — the EDI-mandate moment</h3>
+          <p>A dropship SMB wins a Target Plus / Walmart DSV / Wayfair program and finds an EDI
+            requirement standing between them and the revenue. The largest, most-proven “take my money”
+            trigger in the category — the pain SPS Commerce was built on.</p>
+        </div>
+        <div class="card" style="border-top:3px solid var(--amber);">
+          <h3>Who we serve — the reseller in the middle</h3>
+          <p>Dropship SMBs sourcing from many vendors and selling on many channels — the seat incumbents
+            (SPS, Rithum, Logicbroker) ignore or over-price. We serve their <b>whole</b> EDI life, both
+            as supplier and as buyer.</p>
+        </div>
+      </div>
+
+      <p class="eyebrow" style="margin:28px 0 12px;">Why we win</p>
+      <div class="grid-3">
+        <div class="card"><h3>Dropship-native, whole portfolio</h3><p>EDI <em>and</em> CSV/API via connectors — the customer keeps their tools and never touches EDI. Generalists treat this as two customers; we treat it as one.</p></div>
+        <div class="card"><h3>AI-collapsed onboarding</h3><p>An agent drafts maps in hours, not weeks — undercutting the setup-fee cost structure that makes incumbents slow and pricey. This is the disruption, not “we also do EDI.”</p></div>
+        <div class="card"><h3>The template-catalog moat</h3><p>A shared vendor-map catalog, seeded from 60–70 real integrations. Once a partner is mapped, the next customer onboards in minutes — SPS’s network effect, aimed at SMB.</p></div>
+      </div>
+
+      <div class="rule-cap" style="margin-top:22px;">
+        <span class="mono" style="color:var(--teal);font-weight:700;">REMEMBER</span>
+        <span>The pain is proven and specific; the fear we sell into is real and durable; the per-partner
+          variability is the <b>moat</b>, not the obstacle.</span>
+      </div>
+    </section>
+
+    <!-- ENGINE / BIDIRECTIONAL -->
+    <section id="engine">
+      <div class="sec-head">
+        <p class="eyebrow">The engine · bidirectional flow</p>
+        <h2>The whole engine is four tiny jobs</h2>
+        <p>Everything the product does is a combination of these four “primitives.” Because the engine
+          is symmetric, which <em>seat</em> the customer sits in is just wiring.</p>
+      </div>
+
+      <div class="prim-grid">
+        <div class="prim"><div class="p-name">INGEST-EDI</div><div class="p-dir">partner X12 → <b>canonical</b></div></div>
+        <div class="prim"><div class="p-name">EMIT-EDI</div><div class="p-dir"><b>canonical</b> → partner X12</div></div>
+        <div class="prim"><div class="p-name">INGEST-DATA</div><div class="p-dir">customer system → <b>canonical</b></div></div>
+        <div class="prim"><div class="p-name">EMIT-DATA</div><div class="p-dir"><b>canonical</b> → customer system</div></div>
+      </div>
+
+      <div class="wiring">
+        <div class="seat sell">
+          <h3>Sell-side <span class="tag">customer = supplier · our wedge</span></h3>
+          <p class="note">The big partner mandates EDI. This is where the money and the fear are.</p>
+          <div class="steps">
+            <div class="step"><span class="mono-op">Ingest-EDI</span><span class="txt">partner <b>850</b> (PO) → canonical</span></div>
+            <div class="step"><span class="mono-op">Emit-data</span><span class="txt">order into <b>Shopify / DB</b></span></div>
+            <div class="step"><span class="mono-op">Ingest-data</span><span class="txt">ship + invoice back → canonical</span></div>
+            <div class="step"><span class="mono-op">Emit-EDI</span><span class="txt"><b>855 · 856 · 810 · 997</b> to partner</span></div>
+          </div>
+        </div>
+        <div class="seat buy">
+          <h3>Buy-side <span class="tag">customer = buyer · old engine</span></h3>
+          <p class="note">The customer procures from their own vendors. Same engine, reversed.</p>
+          <div class="steps">
+            <div class="step"><span class="mono-op">Ingest-data</span><span class="txt">customer PO → canonical</span></div>
+            <div class="step"><span class="mono-op">Emit-EDI</span><span class="txt"><b>850</b> to vendor</span></div>
+            <div class="step"><span class="mono-op">Ingest-EDI</span><span class="txt">vendor <b>855 · 856 · 810 · 846</b> → canonical</span></div>
+            <div class="step"><span class="mono-op">Emit-data</span><span class="txt">into customer system</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAPPINGS -->
+    <section id="mappings">
+      <div class="sec-head">
+        <p class="eyebrow">Mappings · the heart of it</p>
+        <h2>Two kinds of map, one hub, zero partner logic in code</h2>
+        <p>A map is a small declarative file: “this field here = that position there.” The engine only
+          <em>interprets</em> maps — so onboarding a partner is a new map, reviewed and tested, never a code change.</p>
+      </div>
+      <div class="grid-2">
+        <div class="card" style="border-top:3px solid var(--teal);">
+          <h3>Partner (EDI) map</h3>
+          <p>canonical ⇄ a partner’s X12 — their quirks, qualifiers, and version. Validated by
+            <span class="code-inline">edi-map.schema.json</span>.</p>
+        </div>
+        <div class="card" style="border-top:3px solid var(--amber);">
+          <h3>Connector map</h3>
+          <p>canonical ⇄ a customer system’s shape — a Shopify order, a CSV column layout — written in the
+            same DSL.</p>
+        </div>
+      </div>
+      <div class="rule-cap" style="margin-top:16px;">
+        <span class="mono" style="color:var(--teal);font-weight:700;">WAS → NOW</span>
+        <span>The old <span class="code-inline">is_td5</span> / <span class="code-inline">inc_vadd</span>
+          boolean columns and <span class="code-inline">if/else</span> branches become <b>data in a map.</b>
+          That’s the moat.</span>
+      </div>
+    </section>
+
+    <!-- VERSIONS -->
+    <section id="versions">
+      <div class="sec-head">
+        <p class="eyebrow">Version handling · 4010 · 5010 · …</p>
+        <h2>The engine is version-neutral</h2>
+        <p>A version difference is just structural variation — the map absorbs it, exactly like partner
+          quirks. The interpreter never branches on version.</p>
+      </div>
+      <div class="grid-3">
+        <div class="card"><h3>Role 1 — Selector</h3><p>Picks the map by <span class="code-inline">(partner, docType, direction, version)</span>. Read from GS08 inbound, from config outbound.</p></div>
+        <div class="card"><h3>Role 2 — Envelope value</h3><p>Stamped into GS08. ISA/GS structure is stable across the 40x0/50x0 families, so the envelope carries version without branching.</p></div>
+        <div class="card"><h3>Role 3 — Validation key</h3><p>Selects the right per-version X12 dictionary. Reference data — thin in v1, grows in Phase&nbsp;4.</p></div>
+      </div>
+      <p style="margin-top:16px;color:var(--muted);font-size:.9rem;"><b style="color:var(--ink);">v1:</b> target <b style="color:var(--ink);">4010</b> (dominant in retail/dropship); add versions per real partner demand — each new version is a new map, never engine work.</p>
+    </section>
+
+    <!-- DOC TYPES -->
+    <section id="doctypes">
+      <div class="sec-head">
+        <p class="eyebrow">EDI document types · v1 set</p>
+        <h2>The dropship order-to-cash loop</h2>
+        <p>All six are “just canonical documents + maps.”</p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Doc</th><th>Name</th><th>Sender (sell-side)</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><span class="doc-code">850</span></td><td>Purchase Order</td><td>partner → customer</td><td>“Here’s an order.”</td></tr>
+            <tr><td><span class="doc-code">855</span></td><td>PO Acknowledgment</td><td>customer → partner</td><td>“Got it — accepted / changed.”</td></tr>
+            <tr><td><span class="doc-code">856</span></td><td>ASN (ship notice)</td><td>customer → partner</td><td>“It shipped — what &amp; how.”</td></tr>
+            <tr><td><span class="doc-code">810</span></td><td>Invoice</td><td>customer → partner</td><td>“Here’s the bill.”</td></tr>
+            <tr><td><span class="doc-code">846</span></td><td>Inventory / Price Advice</td><td>customer / vendor</td><td>“Current stock &amp; price.” (feeds inventory)</td></tr>
+            <tr><td><span class="doc-code">997</span></td><td>Functional Ack</td><td>both ways</td><td>“I received your EDI file.” (technical receipt)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section id="services">
+      <div class="sec-head">
+        <p class="eyebrow">Centralized / shared services</p>
+        <h2>What every document flow leans on</h2>
+        <p>Built progressively — the phase each one arrives in is tagged.</p>
+      </div>
+      <div class="grid-3">
+        <div class="card"><span class="phasetag">P1 →</span><h3 style="margin-top:8px;">Registry</h3><p>Stores &amp; versions all maps + config; the shared <b>template catalog</b> — the moat.</p></div>
+        <div class="card"><span class="phasetag">P3 →</span><h3 style="margin-top:8px;">Reference data</h3><p>Code cross-refs (partner UOM/SCAC ↔ canonical) and SKU/UPC/GTIN identity.</p></div>
+        <div class="card"><span class="phasetag">P2</span><h3 style="margin-top:8px;">Control numbers</h3><p>Hands out unique ISA13/GS06/ST02; prevents duplicates.</p></div>
+        <div class="card"><span class="phasetag">P1</span><h3 style="margin-top:8px;">Secrets vault</h3><p>Partner/connector credentials — encrypted, never in config tables.</p></div>
+        <div class="card"><span class="phasetag">P2</span><h3 style="margin-top:8px;">Raw store</h3><p>Every received &amp; sent file kept <b>byte-for-byte, forever</b> (audit / disputes).</p></div>
+        <div class="card"><span class="phasetag">P3→4</span><h3 style="margin-top:8px;">Validation</h3><p>Syntactic (vs IG) + business rules (chargebacks).</p></div>
+        <div class="card"><span class="phasetag">P2 →</span><h3 style="margin-top:8px;">Workflow / lifecycle</h3><p>Tracks each document’s state; retries; dead-letters failures.</p></div>
+        <div class="card"><span class="phasetag">P5</span><h3 style="margin-top:8px;">Observability</h3><p>Dashboards, search, replay — the control tower.</p></div>
+        <div class="card"><span class="phasetag">P1</span><h3 style="margin-top:8px;">Tenancy / RBAC</h3><p>Isolates each customer’s data; who-can-do-what.</p></div>
+        <div class="card"><span class="phasetag">P3</span><h3 style="margin-top:8px;">Sandbox + AI onboarding</h3><p>Test maps against real samples; the agent drafts maps in a loop.</p></div>
+      </div>
+    </section>
+
+    <!-- CONNECTORS -->
+    <section id="connectors">
+      <div class="sec-head">
+        <p class="eyebrow">Connectors layer · the customer edge</p>
+        <h2>Keep your spreadsheet — we do the EDI</h2>
+        <p>A connector = a thin adapter (auth + I/O) + a connector map to canonical. New ones are mostly
+          config, not forks — the mirror of partner maps. Some partners (Amazon, Target+) are API-based, so
+          connectors serve that side too.</p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Class</th><th>Examples</th><th>Ship in v1?</th></tr></thead>
+          <tbody>
+            <tr><td><b>File</b></td><td>CSV / Excel via SFTP or upload</td><td class="yes">✓ universal safety net</td></tr>
+            <tr><td><b>Generic API</b></td><td>configurable REST + webhook</td><td class="yes">✓ escape hatch for anything</td></tr>
+            <tr><td><b>E-commerce / marketplace</b></td><td>Shopify · Amazon SP-API · Walmart · WooCommerce</td><td class="yes">✓ one (Shopify or beachhead’s system)</td></tr>
+            <tr><td><b>Accounting / ERP</b></td><td>QuickBooks · NetSuite · Business Central · Odoo</td><td class="later">later (per client)</td></tr>
+            <tr><td><b>Database</b></td><td>direct SQL / change-data-capture</td><td class="later">later</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- AI ONBOARDING -->
+    <section id="onboarding">
+      <div class="sec-head">
+        <p class="eyebrow">AI onboarding · the moat</p>
+        <h2>The sandbox is the oracle. The agent loops until it’s right.</h2>
+        <p>The sandbox and the onboarding agent aren’t two features — the sandbox is the deterministic
+          environment <em>and</em> verifier; the agent is the actor that authors a map by looping against
+          it. A wrong map simply fails and bounces back, so nothing unproven survives.</p>
+      </div>
+
+      <div class="loop">
+        <div class="loop-step"><span class="ls-num">STEP 1</span><span class="ls-t">Propose</span><span class="ls-d">Agent drafts a candidate map from the partner IG + sample files.</span></div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step"><span class="ls-num">STEP 2</span><span class="ls-t">Run</span><span class="ls-d">Sandbox executes: deterministic engine → validate → diff vs expected.</span></div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step"><span class="ls-num">STEP 3</span><span class="ls-t">Report</span><span class="ls-d">Structured, machine-readable failures — what, where, expected vs got.</span></div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step"><span class="ls-num">STEP 4</span><span class="ls-t">Revise</span><span class="ls-d">Agent reads the report and fixes the map.</span></div>
+        <span class="loop-arrow">→</span>
+        <div class="loop-step" style="border-color:var(--teal);"><span class="ls-num">STEP 5</span><span class="ls-t">Approve</span><span class="ls-d">Human signs off → immutable published map, pinned to the relationship.</span></div>
+      </div>
+      <div class="loop-repeat">↺&nbsp;&nbsp;Steps 2–4 repeat automatically until the report is green — no human in that inner loop.</div>
+
+      <div class="mini-cols" style="margin-top:26px;">
+        <div class="card">
+          <h3>Algorithm-paired agents</h3>
+          <p style="margin:6px 0 12px;">Deterministic code does the mechanical 80%; the AI agent handles the ambiguous 20%. The oracle verifies everything.</p>
+          <div class="mini-cols" style="gap:14px;">
+            <div style="font-size:.85rem;color:var(--ink-soft);"><span class="mono" style="color:var(--muted);font-size:.66rem;letter-spacing:.09em;">DETERMINISTIC</span><br>X12 parse · validation · diffing · fuzzy field-match</div>
+            <div style="font-size:.85rem;color:var(--ink-soft);"><span class="mono" style="color:var(--teal);font-size:.66rem;letter-spacing:.09em;">AI AGENT</span><br>read prose IG · infer intent · explain errors + propose fix</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Minimum human-in-the-loop</h3>
+          <p style="margin:6px 0 12px;">Humans enter at exactly three gates — everything else runs unattended.</p>
+          <ul style="margin:0;padding-left:18px;font-size:.88rem;color:var(--ink-soft);line-height:1.65;">
+            <li>Promotion approval (always)</li>
+            <li>Low-confidence / stuck escalation</li>
+            <li>Ambiguity — one targeted question</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rule-cap" style="margin-top:18px;">
+        <span class="mono" style="color:var(--teal);font-weight:700;">BOTH ENDS</span>
+        <span>One sandbox solves both directions — <b>we map their format</b> (fix our map) and
+          <b>they map ours</b> (emit plain-language guidance for them). Canonical is always the pivot.</span>
+      </div>
+    </section>
+
+    <!-- LIVE DATA / EVENT LAYER -->
+    <section id="livedata">
+      <div class="sec-head">
+        <p class="eyebrow">Live data · event layer (not an ERP)</p>
+        <h2>Real-time inventory &amp; pricing — a thin event layer, not an ERP</h2>
+        <p>An event-driven layer that keeps <b>one live truth per SKU</b> and pushes fast updates to
+          channels. It decouples channel accuracy from the customer’s slow ERP — we don’t replace their
+          ERP, we own the availability layer.</p>
+      </div>
+
+      <div class="flow" role="img" aria-label="Inventory sources feed the event layer, which pushes live availability to channels">
+        <div class="node customer">
+          <span class="n-label">Sources</span>
+          <span class="n-title">846 feeds · connector stock · warehouse/3PL</span>
+          <span class="n-sub">Continuously changing.</span>
+        </div>
+        <div class="link cust"><span class="arrows">→</span><span class="l-label">events</span></div>
+        <div class="node hub">
+          <span class="n-label">Event layer</span>
+          <span class="n-title">One live truth per SKU</span>
+          <div class="docs"><span>availability</span><span>price</span><span>buffers</span></div>
+        </div>
+        <div class="link"><span class="arrows">→</span><span class="l-label">fast push</span></div>
+        <div class="node partner">
+          <span class="n-label">Channels</span>
+          <span class="n-title">Shopify · Amazon · marketplaces</span>
+          <span class="n-sub">Accurate stock &amp; price.</span>
+        </div>
+      </div>
+
+      <p class="eyebrow" style="margin:24px 0 12px;">Live view · control tower</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>SKU</th><th>Source</th><th class="num">Available</th><th class="num">Price</th><th>Last sync</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">SUP-982</td><td>Vendor 846</td><td class="num">1,240</td><td class="num">$18.50</td><td>12s ago</td><td><span class="pill good">IN SYNC</span></td></tr>
+            <tr><td class="mono">MFG-1234</td><td>Warehouse</td><td class="num">36</td><td class="num">$44.00</td><td>8s ago</td><td><span class="pill warn">LOW · buffer hit</span></td></tr>
+            <tr><td class="mono">ABC-11A</td><td>Vendor 846</td><td class="num">0</td><td class="num">$9.25</td><td>3s ago</td><td><span class="pill crit">OVERSELL RISK</span></td></tr>
+            <tr><td class="mono">KIT-77</td><td>Connector</td><td class="num">512</td><td class="num">$27.90</td><td>20s ago</td><td><span class="pill good">IN SYNC</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rule-cap" style="margin-top:18px;">
+        <span class="mono" style="color:var(--teal);font-weight:700;">NOT AN ERP</span>
+        <span>No general ledger, accounting, or procurement — just <b>availability + price truth +
+          visibility.</b> The ERP stays system-of-record for financials (slower, theirs); availability is
+          fast, and ours.</span>
+      </div>
+    </section>
+
+    <!-- DB SCHEMA -->
+    <section id="schema">
+      <div class="sec-head">
+        <p class="eyebrow">Database schema · proposed</p>
+        <h2>Multi-tenant from day one, config-as-data</h2>
+        <p><span class="code-inline">tenant_id</span> everywhere; maps and raw artifacts immutable once
+          published. <span class="core">★</span> marks v1-core tables; the rest arrive with their phase.</p>
+      </div>
+      <div class="db-grid">
+        <div class="db-group">
+          <h3>Tenancy &amp; identity</h3>
+          <div class="db-list">
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> tenant</span><span class="desc">the customer org (harvest: <code>client</code>)</span></div>
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> user · role</span><span class="desc">login + RBAC, scoped to tenant</span></div>
+          </div>
+        </div>
+        <div class="db-group">
+          <h3>Trading setup (config)</h3>
+          <div class="db-list">
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> trading_partner</span><span class="desc">a partner a tenant trades with</span></div>
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> trading_relationship</span><span class="desc">tenant ↔ partner: docs, direction, version</span></div>
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> envelope_config</span><span class="desc">ISA/GS per relationship (harvest: <code>kon_x12settings</code>)</span></div>
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> connection</span><span class="desc">transport (SFTP/API); creds → vault</span></div>
+            <div class="db-row"><span class="tbl-name">connector_instance</span><span class="desc">a configured connector <span class="phasetag">P2</span></span></div>
+          </div>
+        </div>
+        <div class="db-group">
+          <h3>Maps &amp; registry</h3>
+          <div class="db-list">
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> edi_map</span><span class="desc">partner map; DSL JSON; immutable when published</span></div>
+            <div class="db-row"><span class="tbl-name">connector_map</span><span class="desc">customer-side map to canonical <span class="phasetag">P2</span></span></div>
+            <div class="db-row"><span class="tbl-name">map_template</span><span class="desc">catalog entry → subscribe + override <span class="phasetag">P3</span></span></div>
+          </div>
+        </div>
+        <div class="db-group">
+          <h3>Documents &amp; raw</h3>
+          <div class="db-list">
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> interchange</span><span class="desc">ISA-level envelope + control numbers + ack</span></div>
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> document</span><span class="desc">one doc; holds <b>canonical JSON</b>; status</span></div>
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> raw_artifact</span><span class="desc">immutable raw bytes + hash, in/out</span></div>
+          </div>
+        </div>
+        <div class="db-group">
+          <h3>Control &amp; processing</h3>
+          <div class="db-list">
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> control_number_sequence</span><span class="desc">ISA13/GS06/ST02 counters (harvest: <code>x12Data</code>)</span></div>
+            <div class="db-row"><span class="tbl-name"><span class="core">★</span> process_log</span><span class="desc">lifecycle, retries, dead-letter (harvest: <code>x12ProcessLogs</code>)</span></div>
+          </div>
+        </div>
+        <div class="db-group">
+          <h3>Reference · compliance · inventory · sandbox</h3>
+          <div class="db-list">
+            <div class="db-row"><span class="tbl-name">code_crossref · product_identity</span><span class="desc">code &amp; SKU cross-reference <span class="phasetag">P3</span></span></div>
+            <div class="db-row"><span class="tbl-name">x12_dictionary</span><span class="desc">per-version validation data <span class="phasetag">P4</span></span></div>
+            <div class="db-row"><span class="tbl-name">rule_pack · compliance_result</span><span class="desc">chargeback rules + results <span class="phasetag">P4</span></span></div>
+            <div class="db-row"><span class="tbl-name">inventory_availability</span><span class="desc">current stock/price truth <span class="phasetag">P5</span></span></div>
+            <div class="db-row"><span class="tbl-name">sandbox_run · test_case</span><span class="desc">candidate runs + golden cases <span class="phasetag">P3</span></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="db-legend">
+        <span><span class="core">★</span> = v1 core table</span>
+        <span><span class="phasetag" style="display:inline">Pn</span> = arrives in phase n</span>
+        <span><code>code</code> = harvested from the old app</span>
+      </div>
+    </section>
+
+    <!-- JOURNEY -->
+    <section id="journey">
+      <div class="sec-head">
+        <p class="eyebrow">A document’s journey · one concrete trace</p>
+        <h2>Inbound 850 → the customer’s Shopify</h2>
+        <p>Sell-side. Nothing in the path knows the retailer’s name or the X12 version — it’s all data.</p>
+      </div>
+      <div class="journey">
+        <div class="j-step"><span class="num"></span><span class="body">Retailer drops an X12 <b>850</b> on SFTP</span><span class="svc">Transport · P2</span></div>
+        <div class="j-step"><span class="num"></span><span class="body">Raw bytes stored, hash recorded</span><span class="svc">raw_artifact</span></div>
+        <div class="j-step"><span class="num"></span><span class="body">Envelope parsed (ISA/GS/ST), <b>version read</b></span><span class="svc">EnvelopeService</span></div>
+        <div class="j-step"><span class="num"></span><span class="body">Map selected: <b>(retailer, 850, inbound, 4010)</b></span><span class="svc">Registry</span></div>
+        <div class="j-step"><span class="num"></span><span class="body"><b>Ingest-EDI</b> runs the map → canonical Order850</span><span class="svc">document</span></div>
+        <div class="j-step"><span class="num"></span><span class="body"><b>997</b> ack generated back to the retailer</span><span class="svc">Emit-EDI</span></div>
+        <div class="j-step"><span class="num"></span><span class="body"><b>Emit-data</b> pushes the order into Shopify</span><span class="svc">Connector</span></div>
+      </div>
+    </section>
+
+    <!-- PHASES -->
+    <section id="phases">
+      <div class="sec-head">
+        <p class="eyebrow">The phases · how we get there</p>
+        <h2>Each phase: a clean layer and a sellable capability</h2>
+        <p>Build the spine first (Phases 1–2), then layer the ambitious pieces onto a working pipe.</p>
+      </div>
+      <div class="phases">
+        <div class="phase now">
+          <span class="ph-num">PHASE 1</span>
+          <span class="ph-adds">Deterministic core</span>
+          <span class="ph-out">canonical · mapping engine · envelope · x12 → config-driven round trip, zero hardcoded partner logic</span>
+        </div>
+        <div class="phase">
+          <span class="ph-num">PHASE 2</span>
+          <span class="ph-adds">Connectors + transport</span>
+          <span class="ph-out">first real end-to-end — sellable slice #1</span>
+        </div>
+        <div class="phase">
+          <span class="ph-num">PHASE 3</span>
+          <span class="ph-adds">Sandbox + agentic onboarding</span>
+          <span class="ph-out">onboard a new partner in hours — the moat</span>
+        </div>
+        <div class="phase">
+          <span class="ph-num">PHASE 4</span>
+          <span class="ph-adds">Compliance</span>
+          <span class="ph-out">stop the chargebacks — direct ROI</span>
+        </div>
+        <div class="phase">
+          <span class="ph-num">PHASE 5</span>
+          <span class="ph-adds">Inventory + control tower</span>
+          <span class="ph-out">real-time sync + single pane — sellable-complete v1</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- REMEMBER -->
+    <section style="border-top:none;">
+      <div class="remember">
+        <p class="eyebrow">The five things to remember</p>
+        <h2>If you forget everything else</h2>
+        <ul class="r-list">
+          <li><span class="rn"></span><span class="rt"><b>Everything goes through canonical.</b> Two edges, one hub.</span></li>
+          <li><span class="rn"></span><span class="rt"><b>Partners, versions, formats = data (maps), never code.</b></span></li>
+          <li><span class="rn"></span><span class="rt"><b>The engine is four primitives.</b> Bidirectional &amp; both roles are just wiring.</span></li>
+          <li><span class="rn"></span><span class="rt"><b>AI at the edges</b> (onboarding, exceptions); deterministic core in the hot path.</span></li>
+          <li><span class="rn"></span><span class="rt"><b>Spine first, then climb the rungs.</b></span></li>
+        </ul>
+      </div>
+    </section>
+
+  </div>
+  <footer>
+    <div class="wrap">EDI PLATFORM · v1 ARCHITECTURE · consolidates docs/design + docs/strategy · 2026-07-31</div>
+  </footer>
+</main>

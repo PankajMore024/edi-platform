@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://koneect.local/schema/canonical/855.schema.json",
+  "title": "Canonical 855 (PO Acknowledgment) — business document, direction-NEUTRAL",
+  "description": "Acknowledgment of a PO. Direction is a relationship property: product OUTPUT when the client RECEIVES an 855 (buyer role), product INPUT when the client SENDS an 855 (supplier role acking a received 850). `_meta` is populated only on inbound (receive). Supersedes the old 855.inbound shape (D9 revised) — source/unmapped moved to the shared inboundMeta.",
+  "type": "object",
+  "required": ["ack"],
+  "additionalProperties": false,
+  "properties": {
+    "ack": {
+      "type": "object",
+      "required": ["poNumber", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "poNumber": { "type": "string", "description": "The PO being acknowledged (BAK03)." },
+        "status": {
+          "type": "string",
+          "description": "Overall acknowledgment (BAK01): AC=accepted, AD=ack w/ detail, RD/RJ/RF=rejected variants.",
+          "enum": ["AC", "AD", "RD", "RJ", "RF", "unknown"]
+        },
+        "ackDate": { "type": "string", "format": "date" },
+        "references": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/typedValue" } },
+        "lines": {
+          "type": "array",
+          "description": "Per-line acknowledgment (ACK segments).",
+          "items": {
+            "type": "object",
+            "required": ["line", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "line": { "type": ["integer", "string"] },
+              "status": { "type": "string", "description": "Line ack code: IA=accepted, IR=rejected, IB=backordered, IC=changed." },
+              "qty": { "type": ["number", "string"] },
+              "uom": { "type": "string" },
+              "price": { "type": ["number", "string"] },
+              "ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/typedValue" } }
+            }
+          }
+        }
+      }
+    },
+    "extensions": { "type": "object", "additionalProperties": true },
+    "_meta": {
+      "$ref": "common.schema.json#/definitions/inboundMeta",
+      "description": "Populated ONLY when this 855 was RECEIVED (buyer role)."
+    }
+  }
+}

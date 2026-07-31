@@ -1,0 +1,29 @@
+*.csv
+*.zip
+*.log
+*.xlsx
+*.sql
+*.pdf
+*.xls
+*.bz2
+*.gz
+*.tar
+*.tgz
+.env
+node_modules
+storage
+# Scratch area for real (redacted) production artifacts shared for design analysis.
+# NEVER commit real partner data / credentials — see docs/context.md IP gate (O2).
+docs/_private/
+docs/EDI_DOCS/
+.DS_Store
+
+# --- hardening (personal repo) ---
+.env.*
+*.pem
+*.key
+*.p12
+*.keystore
+platform/node_modules
+platform/dist
+platform/coverage
