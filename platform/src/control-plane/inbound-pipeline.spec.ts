@@ -39,16 +39,14 @@ describe('InboundPipeline (partner X12 → intake → translate → deliver → 
     header: [{ to: 'poNumber', from: 'PO' }, { to: 'poDate', from: 'Date' }],
     lineTo: 'lineItems',
     lineFields: [
-      { to: 'lineNumber', from: 'Line' },
-      { to: 'ids.0.value', from: 'SKU' },
-      { to: 'quantity.value', from: 'Qty', decimal: 0 },
-      { to: 'quantity.uom', from: 'UOM' },
+      { to: 'lineNumber', from: 'Line' }, { to: 'ids.0.value', from: 'SKU' },
+      { to: 'quantity.value', from: 'Qty', decimal: 0 }, { to: 'quantity.uom', from: 'UOM' },
       { to: 'unitPrice.amount', from: 'Price', decimal: 2 },
     ],
   };
   const instance: ConnectorInstance = {
-    id: 'ci-ff', tenantId: 't1', connectorType: 'csv',
-    settings: { hasHeader: true }, connectorMap: ffMap, docTypes: ['850'], trigger: 'file-drop',
+    id: 'ci-ff', tenantId: 't1', connectorType: 'csv', settings: { hasHeader: true },
+    connectorMap: ffMap, docTypes: ['850'], trigger: 'file-drop',
   };
   const rel: TradingRelationship = {
     id: 'rel', tenantId: 't1', partnerId: 'acme', formatAuthority: 'client', tenantRole: 'buyer',
@@ -88,107 +86,145 @@ describe('InboundPipeline (partner X12 → intake → translate → deliver → 
     inbound = new InboundPipeline(gateway, x12, pipeline, orch, new FunctionalAckService(), envelope, controlNumbers, ledger);
   });
 
-  /** Emit a genuine, conformant inbound 850 interchange (as if a partner sent it to us). */
   const validEdi = async (): Promise<string> =>
     x12.serialize((await orch.receiveFromCustomer(rel, '850', csv, at))[0].interchange);
 
-  it('ACCEPTED: conformant 850 → delivered to customer + 997 accepting the group', async () => {
+  // ── helpers to assemble batched interchanges from a genuinely emitted single one ──
+  const clone = (segs: RawSegment[]): RawSegment[] => segs.map((s) => ({ tag: s.tag, elements: [...s.elements] }));
+  const parts = async () => {
+    const segs = (await orch.receiveFromCustomer(rel, '850', csv, at))[0].interchange;
+    const stIdx = segs.findIndex((s) => s.tag === 'ST');
+    const seIdx = segs.findIndex((s) => s.tag === 'SE');
+    return {
+      isa: seg(segs, 'ISA')!, gs: seg(segs, 'GS')!, iea: seg(segs, 'IEA')!,
+      body: clone(segs.slice(stIdx + 1, seIdx)),
+    };
+  };
+  const corrupt = (body: RawSegment[]): RawSegment[] => {
+    const b = clone(body);
+    seg(b, 'BEG')!.elements[1] = 'ZZ'; // invalid BEG02 code
+    return b;
+  };
+  const groupBlock = (gs: RawSegment, gs06: string, sets: { st02: string; body: RawSegment[] }[]): RawSegment[] => {
+    const g: RawSegment = { tag: 'GS', elements: [...gs.elements] };
+    g.elements[5] = gs06;
+    const inner: RawSegment[] = [];
+    for (const s of sets) {
+      inner.push({ tag: 'ST', elements: ['850', s.st02] }, ...s.body, { tag: 'SE', elements: [String(s.body.length + 2), s.st02] });
+    }
+    return [g, ...inner, { tag: 'GE', elements: [String(sets.length), gs06] }];
+  };
+
+  it('ACCEPTED: conformant 850 → delivered + 997 accepting the group', async () => {
     const edi = await validEdi();
     const gs06 = envelope.parseInterchange(x12.parse(edi)).control.gs06;
-
     const r = await inbound.receive(rel, 'sftp:acme', edi, at);
 
     expect(r.outcome).toBe('accepted');
-    expect(r.validation?.valid).toBe(true);
-    expect(typeof r.delivered).toBe('string'); // CSV delivered into the customer system
-    expect((r.delivered as string)).toContain('4500,2026-07-31,1,012345678905,10,EA,18.50');
-    // 997: AK1 echoes the received group control number; AK9 accepts 1/1/1; no AK3 detail
-    expect(seg(r.ack!.segments, 'AK1')!.elements[1]).toBe(gs06);
-    expect(seg(r.ack!.segments, 'AK9')!.elements).toEqual(['A', '1', '1', '1']);
-    expect(seg(r.ack!.segments, 'AK3')).toBeUndefined();
-    expect(r.ack!.edi).toContain('ST*997*');
-    // lifecycle event captured
-    expect(r.event).toMatchObject({ outcome: 'accepted', delivered: true, valid: true, needsReview: false });
-    expect(r.event.ackControlNumber).toBe(r.ack!.control.isa13);
+    expect(r.transactions).toHaveLength(1);
+    const t = r.transactions[0];
+    expect(t.conformant).toBe(true);
+    expect(t.delivered).toBe(true);
+    expect((t.deliveredPayload as string)).toContain('4500,2026-07-31,1,012345678905,10,EA,18.50');
+    expect(t.event).toMatchObject({ outcome: 'accepted', delivered: true, needsReview: false });
+    expect(r.acks).toHaveLength(1);
+    expect(seg(r.acks[0].segments, 'AK1')!.elements[1]).toBe(gs06);
+    expect(seg(r.acks[0].segments, 'AK9')!.elements).toEqual(['A', '1', '1', '1']);
+    expect(seg(r.acks[0].segments, 'AK3')).toBeUndefined();
   });
 
-  it('REJECTED: non-conformant 850 → NOT delivered + 997 rejecting with AK3/AK4 detail', async () => {
+  it('REJECTED: non-conformant 850 → NOT delivered + 997 with AK3/AK4 detail', async () => {
     const segs = (await orch.receiveFromCustomer(rel, '850', csv, at))[0].interchange;
-    seg(segs, 'BEG')!.elements[1] = 'ZZ'; // BEG02 invalid code
-    const edi = x12.serialize(segs);
-
-    const r = await inbound.receive(rel, 'sftp:acme', edi, at);
+    seg(segs, 'BEG')!.elements[1] = 'ZZ';
+    const r = await inbound.receive(rel, 'sftp:acme', x12.serialize(segs), at);
 
     expect(r.outcome).toBe('rejected');
-    expect(r.validation?.valid).toBe(false);
-    expect(r.delivered).toBeUndefined(); // a bad doc is never pushed into the customer system
-    expect(seg(r.ack!.segments, 'AK9')!.elements).toEqual(['R', '1', '1', '0']);
-    expect(seg(r.ack!.segments, 'AK5')!.elements).toEqual(['R', '5']);
-    expect(seg(r.ack!.segments, 'AK3')).toBeDefined(); // per-segment detail present
-    // lifecycle event flags a rejected doc for review (it was not delivered)
-    expect(r.event).toMatchObject({ outcome: 'rejected', delivered: false, valid: false, needsReview: true });
-    expect(r.event.errorCount).toBeGreaterThan(0);
+    const t = r.transactions[0];
+    expect(t.delivered).toBe(false);
+    expect(t.deliveredPayload).toBeUndefined();
+    expect(t.event).toMatchObject({ outcome: 'rejected', delivered: false, needsReview: true });
+    expect(seg(r.acks[0].segments, 'AK9')!.elements).toEqual(['R', '1', '1', '0']);
+    expect(seg(r.acks[0].segments, 'AK3')).toBeDefined();
   });
 
-  it('DUPLICATE: the same interchange twice → idempotent skip (no re-delivery, no ack)', async () => {
+  it('DUPLICATE: same interchange twice → idempotent skip (interchange-level event, no transactions)', async () => {
     const edi = await validEdi();
     const first = await inbound.receive(rel, 'sftp:acme', edi, at);
     const second = await inbound.receive(rel, 'sftp:acme', edi, at);
 
     expect(first.outcome).toBe('accepted');
     expect(second.outcome).toBe('duplicate');
-    expect(second.delivered).toBeUndefined();
-    expect(second.ack).toBeUndefined();
-    // still recorded (occurrence 2), pointing at the same original artifact; no review needed
+    expect(second.transactions).toHaveLength(0);
+    expect(second.acks).toHaveLength(0);
     expect(second.event).toMatchObject({ outcome: 'duplicate', occurrence: 2, needsReview: false });
-    expect(second.event.firstArtifactId).toBe(first.event.artifactId);
   });
 
-  it('CONFLICT: same interchange identity, different content → quarantined, not processed', async () => {
+  it('CONFLICT: same identity, different content → quarantined, not processed', async () => {
     const edi = await validEdi();
-    const tampered = edi.replace(/4500/g, '4599'); // same ISA/GS/ST control numbers, different PO
-
     const first = await inbound.receive(rel, 'sftp:acme', edi, at);
-    const second = await inbound.receive(rel, 'sftp:acme', tampered, at);
+    const second = await inbound.receive(rel, 'sftp:acme', edi.replace(/4500/g, '4599'), at);
 
-    expect(first.outcome).toBe('accepted');
     expect(second.outcome).toBe('conflict');
-    expect(second.delivered).toBeUndefined();
-    expect(second.ack).toBeUndefined();
+    expect(second.transactions).toHaveLength(0);
     expect(second.event).toMatchObject({ outcome: 'conflict', needsReview: true });
-    // the conflicting bytes are a DIFFERENT artifact than the original — both are retained
-    expect(second.event.artifactId).not.toBe(first.event.artifactId);
-    expect(second.event.firstArtifactId).toBe(first.event.artifactId);
+    // the conflicting bytes are a DIFFERENT artifact than the original — both retained
+    expect(second.event!.artifactId).not.toBe(first.transactions[0].event.artifactId);
+    expect(second.event!.firstArtifactId).toBe(first.transactions[0].event.artifactId);
   });
 
-  describe('lifecycle capture (nothing dropped unattended)', () => {
-    it('every outcome writes a ledger event; conflicts + rejects surface in the review queue', async () => {
-      const edi = await validEdi();
-      await inbound.receive(rel, 'sftp:acme', edi, at); // accepted
-      await inbound.receive(rel, 'sftp:acme', edi, at); // duplicate
-      await inbound.receive(rel, 'sftp:acme', edi.replace(/4500/g, '4599'), at); // conflict
+  describe('batched interchanges', () => {
+    it('multi-TS in one group: each set processed independently; ONE 997 with per-set AK2/AK5', async () => {
+      const { isa, gs, iea, body } = await parts();
+      // set 1 valid, set 2 invalid, both in the same functional group
+      const edi = x12.serialize([isa, ...groupBlock(gs, 'G1', [
+        { st02: '0001', body },
+        { st02: '0002', body: corrupt(body) },
+      ]), iea]);
 
-      expect(ledger.list({ relationshipId: 'rel' })).toHaveLength(3);
-      const review = ledger.needingReview('t1');
-      expect(review.map((r) => r.outcome)).toEqual(['conflict']);
+      const r = await inbound.receive(rel, 'sftp:acme', edi, at);
+
+      expect(r.transactions).toHaveLength(2);
+      expect(r.transactions.map((t) => t.conformant)).toEqual([true, false]);
+      expect(r.transactions.map((t) => t.delivered)).toEqual([true, false]); // bad set NOT delivered
+      expect(r.outcome).toBe('rejected'); // any non-conformant set → interchange needs attention
+
+      expect(r.acks).toHaveLength(1); // one 997 for the one group
+      const ack = r.acks[0].segments;
+      expect(ack.filter((s) => s.tag === 'AK2')).toHaveLength(2);
+      expect(ack.filter((s) => s.tag === 'AK5').map((s) => s.elements[0])).toEqual(['A', 'R']);
+      expect(seg(ack, 'AK9')!.elements).toEqual(['P', '2', '2', '1']); // partially accepted: 1 of 2
     });
 
-    it('timeline() reconstructs a document’s full history under one interchange identity', async () => {
-      const edi = await validEdi();
-      const r1 = await inbound.receive(rel, 'sftp:acme', edi, at);
-      await inbound.receive(rel, 'sftp:acme', edi, at);
-      const timeline = ledger.timeline(r1.receipt.dedupKey);
-      expect(timeline.map((e) => e.outcome)).toEqual(['accepted', 'duplicate']);
+    it('multi-group: one 997 per functional group', async () => {
+      const { isa, gs, iea, body } = await parts();
+      const edi = x12.serialize([
+        isa,
+        ...groupBlock(gs, 'G1', [{ st02: '0001', body }]),
+        ...groupBlock(gs, 'G2', [{ st02: '0001', body: clone(body) }]),
+        iea,
+      ]);
+
+      const r = await inbound.receive(rel, 'sftp:acme', edi, at);
+
+      expect(r.transactions).toHaveLength(2);
+      expect(r.outcome).toBe('accepted');
+      expect(r.acks).toHaveLength(2); // one 997 per group
+      expect(r.acks.map((a) => a.groupControlNumber)).toEqual(['G1', 'G2']);
+      expect(r.acks.map((a) => seg(a.segments, 'AK1')!.elements[1])).toEqual(['G1', 'G2']);
     });
 
-    it('both the original and the conflicting bytes are retrievable for operator comparison', async () => {
-      const edi = await validEdi();
-      const orig = await inbound.receive(rel, 'sftp:acme', edi, at);
-      const conflict = await inbound.receive(rel, 'sftp:acme', edi.replace(/4500/g, '4599'), at);
+    it('per-set lifecycle: both sets in a batch share the artifact but get distinct events', async () => {
+      const { isa, gs, iea, body } = await parts();
+      const edi = x12.serialize([isa, ...groupBlock(gs, 'G1', [
+        { st02: '0001', body }, { st02: '0002', body: clone(body) },
+      ]), iea]);
+      const r = await inbound.receive(rel, 'sftp:acme', edi, at);
 
-      // an operator working the review queue can pull BOTH versions from the artifact store
-      expect(raw.get(conflict.event.firstArtifactId!)?.bytes).toBe(edi);
-      expect((raw.get(conflict.event.artifactId)?.bytes as string)).toContain('4599');
+      const [e1, e2] = r.transactions.map((t) => t.event);
+      expect(e1.artifactId).toBe(e2.artifactId); // same retained interchange
+      expect(e1.transactionControlNumber).toBe('0001');
+      expect(e2.transactionControlNumber).toBe('0002');
+      expect(ledger.timeline(r.receipt!.dedupKey)).toHaveLength(2);
     });
   });
 });

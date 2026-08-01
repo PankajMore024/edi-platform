@@ -69,6 +69,49 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 2: multi-group / multi-TS interchanges (batched, end-to-end)
+
+- **D70. Batched interchanges handled per transaction set, with one 997 per group.** The old
+  single-group `parseInterchange` merged ALL non-envelope segments into one body — a batched
+  interchange (many STs, possibly many GSs) was silently garbled and only one TS acknowledged (a real
+  correctness gap). Added `EnvelopeService.parseGroups` — hierarchical walk ISA→[GS→[ST…SE]*→GE]*→IEA
+  returning `ParsedInterchange{ groups[]: { functionalId, groupControlNumber, transactionSets[]: {
+  code, controlNumber, body } } }`; each set's body is the segments between ST and SE. Kept
+  `parseInterchange` (single) for the existing convenience callers. `TranslationPipeline.ingestBody(
+  rel, docType, body)` extracted as the per-set translate+validate primitive (ingestDocument now
+  delegates to it). `InboundPipeline` rewritten: iterate every group & set, translate/validate/deliver
+  each independently, emit **one 997 per functional group** (AK2/AK5 per set, AK9 A/P/R with real
+  counts), and write **one ProcessingRecord per transaction set** (carrying functionalGroup +
+  transaction control numbers) so each document in a batch has its own lifecycle/review status.
+  `InboundResult` reshaped: `transactions[]` (per set) + `acks[]` (per group); `event` now only for the
+  duplicate/conflict short-circuit. Interchange-level `outcome` = accepted iff every set conformant.
+  **Reprocess is now precise:** a per-TS review event re-runs ONLY that set (siblings untouched → no
+  double-delivery); an interchange-level conflict re-runs the whole interchange (operator explicitly
+  superseding). QuarantineResolver links resolution to `transactions[0].event`. Tests: multi-TS
+  single-group (partial 997 P 2/2/1, only the good set delivered), multi-group (one 997 per group),
+  per-set distinct lifecycle events sharing one artifact, plus the reshaped accepted/rejected/
+  duplicate/conflict + resolver cases. 166 tests green (stable ×3), build clean. **Remaining before
+  fully live:** transport dispatch of the 997s (credential-dependent); TA1 interchange-level ack.
+
+### 2026-08-02 — Phase 2: quarantine-resolution worker (closes the human loop)
+
+- **D69. `QuarantineResolver` — operator actions on the review queue.** Completes D68a: the ledger
+  surfaced conflicts/rejects for review; this lets an operator ACT on them, audited. Actions:
+  `queue(tenantId)` (open items = needsReview && not resolved), `dismiss(eventId, by, note, at)`
+  (close without processing — nothing delivered), `reprocess(rel, eventId, by, note, at)` (re-run the
+  RETAINED bytes through the pipeline, **bypassing dedup**, and deliver+ack if now conformant).
+  Refactored `InboundPipeline`: extracted an intake-agnostic `process(rel, ctx, ts)` core shared by
+  `receive()` (fresh intake) and the new `reprocess(rel, artifact, originalEvent, at)`; `receipt` is
+  now optional on `InboundResult` (a reprocess has no new intake). Ledger gains resolution stamping:
+  `resolve(id, patch)` sets resolution/resolvedAt/resolvedBy/resolutionNote/resolutionEventId;
+  `needingReview` now excludes resolved items. Reprocess links the review event to the NEW processing
+  event (`resolutionEventId`); if the re-run is still non-conformant it's rejected again and the new
+  reject re-enters the queue (original stays resolved). Guards: unknown / non-review / already-resolved
+  events throw. 6 resolver tests (queue, dismiss, conflict→reprocess→accepted+delivered, still-invalid
+  reprocess, guards). 166 tests green (stable ×3), build clean. **Remaining before this loop is fully
+  live:** transport dispatch of the 997 (credential-dependent), multi-group/multi-TS interchanges,
+  TA1 interchange-level ack for conflicts.
+
 ### 2026-08-02 — Phase 2: inbound pipeline (the receive backbone, end-to-end)
 
 - **D68. `InboundPipeline` wires the whole receive loop into one orchestrated, safety-gated path.**

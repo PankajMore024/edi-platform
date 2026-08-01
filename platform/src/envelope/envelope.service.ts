@@ -36,6 +36,26 @@ export interface ControlNumbers {
   st02: string;
 }
 
+/** One transaction set inside a parsed interchange (body excludes the ST/SE envelope segments). */
+export interface ParsedTransactionSet {
+  transactionSetCode: string; // ST01
+  controlNumber: string; // ST02
+  body: RawSegment[];
+}
+
+/** One functional group (GS…GE) inside a parsed interchange. */
+export interface ParsedGroup {
+  functionalId: string; // GS01
+  groupControlNumber: string; // GS06
+  transactionSets: ParsedTransactionSet[];
+}
+
+/** The full hierarchical structure of an interchange: ISA → [GS → [ST…SE]* → GE]* → IEA. */
+export interface ParsedInterchange {
+  isa13: string;
+  groups: ParsedGroup[];
+}
+
 export interface InterchangeContext {
   config: EnvelopeConfig;
   control: ControlNumbers;
@@ -100,8 +120,47 @@ export class EnvelopeService {
   }
 
   /**
+   * Full hierarchical unwrap: walk ISA → GS…GE groups → ST…SE transaction sets, so a BATCHED
+   * interchange (many transaction sets, possibly across several functional groups) is separated
+   * correctly. Each transaction set's `body` is the segments between ST and SE (both excluded).
+   * Segments outside any GS/ST (malformed) are ignored.
+   */
+  parseGroups(segments: RawSegment[]): ParsedInterchange {
+    const isa = segments.find((s) => s.tag === 'ISA');
+    const groups: ParsedGroup[] = [];
+    let group: ParsedGroup | undefined;
+    let ts: ParsedTransactionSet | undefined;
+
+    for (const s of segments) {
+      switch (s.tag) {
+        case 'ISA':
+        case 'IEA':
+          break;
+        case 'GS':
+          group = { functionalId: s.elements[0] ?? '', groupControlNumber: s.elements[5] ?? '', transactionSets: [] };
+          groups.push(group);
+          break;
+        case 'GE':
+          group = undefined;
+          break;
+        case 'ST':
+          ts = { transactionSetCode: s.elements[0] ?? '', controlNumber: s.elements[1] ?? '', body: [] };
+          group?.transactionSets.push(ts);
+          break;
+        case 'SE':
+          ts = undefined;
+          break;
+        default:
+          ts?.body.push(s); // a body segment belongs to the open transaction set
+          break;
+      }
+    }
+    return { isa13: isa?.elements[12] ?? '', groups };
+  }
+
+  /**
    * Unwrap an inbound interchange: extract the transaction body and the header identifiers.
-   * (M1: assumes a single functional group / transaction set.)
+   * (Single-group/single-transaction convenience — for batched interchanges use `parseGroups`.)
    */
   parseInterchange(segments: RawSegment[]): {
     control: ControlNumbers;

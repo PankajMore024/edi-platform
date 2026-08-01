@@ -66,16 +66,20 @@ export class TranslationPipeline {
     return { interchange, validation, control };
   }
 
-  /** Inbound: a full X12 interchange → canonical document, validated per authority. */
+  /** Inbound: a full X12 interchange → canonical document, validated per authority.
+   * (Single-transaction convenience; for batched interchanges parse groups and call `ingestBody`.) */
   ingestDocument(rel: TradingRelationship, interchange: RawSegment[]): IngestResult {
     const parsed = this.envelope.parseInterchange(interchange);
-    const docType = (parsed.transactionSetCode ?? '') as DocType;
+    return this.ingestBody(rel, (parsed.transactionSetCode ?? '') as DocType, parsed.body);
+  }
+
+  /** Translate + validate a single transaction-set BODY (no envelope) for a known doc type. The
+   * per-transaction primitive the inbound pipeline calls once per set in a batched interchange. */
+  ingestBody(rel: TradingRelationship, docType: DocType, body: RawSegment[]): IngestResult {
     const rd = this.findDoc(rel, docType, 'inbound');
     const map = this.maps.get(rd.mapId);
-
-    const doc = this.ingestSvc.ingest(parsed.body, map);
-    const validation = this.validateBody(parsed.body, rd);
-
+    const doc = this.ingestSvc.ingest(body, map);
+    const validation = this.validateBody(body, rd);
     return { docType, doc, validation };
   }
 

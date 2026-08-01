@@ -23,6 +23,10 @@ export interface ProcessingRecord {
   dedupKey: string;
   occurrence: number;
   docType?: string;
+  /** For per-transaction events: the functional-group (GS06) and transaction-set (ST02) control
+   * numbers, so each transaction set in a BATCHED interchange has its own identifiable lifecycle. */
+  functionalGroupControlNumber?: string;
+  transactionControlNumber?: string;
   /** For duplicate/conflict: the original artifact this one duplicates or conflicts with. */
   firstArtifactId?: string;
   firstSeenAt?: string;
@@ -36,7 +40,22 @@ export interface ProcessingRecord {
   /** True when a human must look at this event before it's considered handled (conflicts; rejects). */
   needsReview: boolean;
   note?: string;
+
+  // ── resolution (set when an operator works a review-queue item) ──
+  /** How the event was resolved. Unset while it is still open in the review queue. */
+  resolution?: 'dismissed' | 'reprocessed';
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionNote?: string;
+  /** For `reprocessed`: the id of the NEW processing event the reprocess produced. */
+  resolutionEventId?: string;
 }
+
+/** The fields an operator resolution stamps onto a review event. */
+export type ResolutionPatch = Pick<
+  ProcessingRecord,
+  'resolution' | 'resolvedAt' | 'resolvedBy' | 'resolutionNote' | 'resolutionEventId'
+>;
 
 /** What the caller supplies; `id` is assigned by the ledger. */
 export type ProcessingRecordInput = Omit<ProcessingRecord, 'id'>;
@@ -60,8 +79,10 @@ export abstract class ProcessingLedger {
   abstract list(query?: ProcessingQuery): ProcessingRecord[];
   /** Every event for one interchange identity, oldest first — the full lifecycle of that document. */
   abstract timeline(dedupKey: string): ProcessingRecord[];
-  /** The review queue: events awaiting human attention (conflicts, and rejects). */
+  /** The review queue: OPEN events awaiting human attention (conflicts, rejects — not yet resolved). */
   abstract needingReview(tenantId?: string): ProcessingRecord[];
+  /** Stamp an operator resolution onto a review event. */
+  abstract resolve(id: string, patch: ResolutionPatch): ProcessingRecord;
 }
 
 @Injectable()
@@ -95,6 +116,14 @@ export class InMemoryProcessingLedger extends ProcessingLedger {
   }
 
   needingReview(tenantId?: string): ProcessingRecord[] {
-    return this.list({ tenantId, needsReview: true });
+    // Open items only: flagged for review AND not yet resolved.
+    return this.list({ tenantId, needsReview: true }).filter((r) => !r.resolvedAt);
+  }
+
+  resolve(id: string, patch: ResolutionPatch): ProcessingRecord {
+    const rec = this.records.find((x) => x.id === id);
+    if (!rec) throw new Error(`processing event ${id} not found`);
+    Object.assign(rec, patch);
+    return { ...rec };
   }
 }
