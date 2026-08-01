@@ -7,6 +7,10 @@ import { EnvelopeModule } from './envelope/envelope.module';
 import { MappingModule } from './mapping/mapping.module';
 import { ValidationModule } from './validation/validation.module';
 import { ControlPlaneModule } from './control-plane/control-plane.module';
+import { ConnectorsModule } from './connectors/connectors.module';
+import { IntakeModule } from './intake/intake.module';
+import { AckModule } from './ack/ack.module';
+import { TransportModule } from './transport/transport.module';
 
 /**
  * Root module.
@@ -31,6 +35,18 @@ import { ControlPlaneModule } from './control-plane/control-plane.module';
 
     // Control plane — config that governs the engine (composes the pure cores)
     ControlPlaneModule,
+
+    // Phase 2 — connectors (customer edge)
+    ConnectorsModule,
+
+    // Phase 2 — intake (inbound trust boundary: immutable retention + idempotent dedup)
+    IntakeModule,
+
+    // Phase 2 — acknowledgments (997 functional acknowledgment generation)
+    AckModule,
+
+    // Phase 2 — transport (how bytes move: SFTP/webhook — composed with connectors)
+    TransportModule,
   ],
 })
 export class AppModule {}

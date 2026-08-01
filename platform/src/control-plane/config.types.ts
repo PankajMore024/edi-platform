@@ -31,6 +31,8 @@ export interface RelationshipDocument {
   mapId: string;
   /** Governing spec (house spec if client-authoritative; partner IG if partner-authoritative). */
   specId?: string;
+  /** Customer-edge connector instance for this doc (native ⇄ canonical). */
+  connectorInstanceId?: string;
   enabled: boolean;
 }
 

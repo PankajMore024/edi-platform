@@ -69,7 +69,240 @@ until settled.
 
 ## Decision Log
 
-### 2026-08-01 — Control plane BUILT (engine now governed by config) + console provisions
+### 2026-08-02 — Phase 2: transport axis + connector split (csv/xlsx/database) + SFTP/webhook stubs
+
+- **D67. Transport and format made ORTHOGONAL axes; file connector split; DB connector + transport
+  stubs added.** Prompted by user: "build stub sftp/webhook as a separate connector type", "I don't
+  see xlsx as a separate connector", "what about db?". **Key architecture decision:** transport (how
+  bytes MOVE) and connectors (how bytes TRANSLATE to/from canonical) are separate axes that compose —
+  a running integration = one transport (e.g. sftp) × one format connector (e.g. csv). This avoids a
+  transport×format combinatorial explosion. Both surface in a unified catalog (ConnectorDescriptor
+  `kind:'connector'` vs TransportDescriptor `kind:'transport'`) so the console lists them together.
+  - **File connector split:** `FlatFileConnector` (a `type:'csv'|'xlsx'` config flag) → `FileConnector`
+    base (all csv+xlsx row-codec logic) + `CsvConnector` (`csv`) + `XlsxConnector` (`xlsx`), each a
+    distinct catalog type. `type` passed via base constructor param (D61 registration-order fix).
+    `FlatFileParseConfig` → `FileParseConfig` (dropped the `type` field; format is now the connector).
+  - **DatabaseConnector** (`database`, class `database`): translates a SQL ROWSET (array of row
+    objects) ↔ canonical via ObjectMapper — real + testable. Live SQL (connect/SELECT/UPSERT) is a
+    credential/driver-dependent transport concern, deferred.
+  - **Transport layer** (`src/transport/`): `TransportAdapter` interface (`pull`/`push`,
+    both async) + `TransportRegistry` + `TransportModule`. `SftpTransport` and `WebhookTransport` are
+    **honest stubs**: real descriptors + config surface + config validation (fail loudly on missing
+    host/username/vaultRef/url), but live I/O throws `TransportNotConfiguredError` (needs
+    credentials/SDK). Webhook is push-based (`pull` throws) and its `receive()` is real — it shapes an
+    inbound HTTP delivery into a payload and **rejects a delivery when a signature scheme is configured
+    but the signature header is absent** (an unverified webhook must never be trusted as a source of
+    financial docs; HMAC-vs-secret verification deferred).
+  Connectors registered now: csv, xlsx, database, generic-rest, shopify, amazon, quickbooks (7).
+  Transports: sftp, webhook (2). 151 tests green (stable ×4), build clean, DI smoke tests for both
+  registries. **Phase 2 remaining:** live transport I/O (SFTP client, webhook HMAC + outbound POST,
+  DB drivers) — all credential-dependent; and intake→validate→translate→997 auto-reply wiring (needs
+  live transport to send).
+
+### 2026-08-01 — Phase 2: 997 AK3/AK4 error detail + structured conformance issues
+
+- **D66. Conformance validator now emits STRUCTURED issues; 997 renders AK3/AK4 detail.** The 997
+  previously acknowledged only at TS granularity (D63). To report *which* segment/element failed, the
+  validator had to stop emitting only strings. `ConformanceValidator.validate` now returns
+  `issues: ConformanceIssue[]` (level, segmentTag, segmentPosition, elementPosition, X12 syntax
+  errorCode, badValue, message) and **derives `errors: string[]` from the issues** — single source of
+  truth, so all existing string-assertion tests stayed green. Error-code mappings: segment (AK304)
+  2=unexpected, 3=mandatory missing, 5=exceeds max; element (AK403) 1=missing, 4=too long, 5=too
+  short, 6=invalid char, 7=invalid code, 8/9=invalid date/time. Missing-mandatory-segment uses
+  segmentPosition 0 (absent sentinel — we don't do ordered validation yet). `FunctionalAckService`
+  gains `TransactionSetError` input and a `detailSegments` grouper that emits, between AK2 and AK5:
+  element errors → one AK3 (code '8' = has data element errors) + an AK4 each (AK404 bad value only
+  when present); segment errors → an AK3 with its code, no AK4. AK5 gains AK502='5' (segments in
+  error) whenever detail is emitted. `TransactionSetError` mirrors `ConformanceIssue` field-for-field
+  so the control plane maps 1:1 (kept ack decoupled from validation — no import). Tests: structured
+  issues in conformance spec (codes + positions), AK3/AK4 rendering (element+segment, bad-value echo,
+  AK502), no-error path stays bare, and an **end-to-end** validator-issues→ack-AK3/AK4 test. 138 tests
+  green (stable ×3), build clean. **Phase 2 remaining:** transport adapters (SFTP/webhook —
+  credential-dependent). This is the last credential-free Phase 2 item done.
+
+### 2026-08-01 — Phase 2: xlsx support + async connector edge
+
+- **D65. xlsx (Excel) support + Connector edge made async.** Many SMB vendors send Excel, not CSV.
+  Added xlsx ingest/emit to FlatFileConnector via **exceljs** (chosen over SheetJS: SheetJS's npm
+  0.18.5 carries prototype-pollution + ReDoS CVEs — patched only on their CDN; exceljs is MIT,
+  maintained, and its runtime deps don't include the flagged lodash, which comes only from
+  @nestjs/cli dev tooling). **Decision (user-approved):** the `Connector` interface is now **async**
+  (`ingest`/`emitData` return Promises) — exceljs is async, and it's the correct model for the whole
+  connector edge (real connectors do I/O: parse binary, HTTP, SFTP, OAuth) and for the transport
+  layer next. Ripple was mechanical: PayloadConnector base, FlatFileConnector, IntegrationOrchestrator
+  (await), and all connector specs (`rejects.toThrow` for the throw cases). `FlatFileParseConfig`
+  gains `type: 'csv'|'xlsx'` + `sheet?`. xlsx is **binary**: ingest expects Buffer/Uint8Array (throws
+  on a string — a UTF-8 string would corrupt binary), emit returns a Buffer.
+  **`cellToString` is where xlsx correctness lives** — explicit handling of typed numbers, booleans,
+  Dates (→ISO, deterministic), formula cells (uses `.result`, never the formula text), rich text,
+  hyperlinks; and it **throws on an Excel error cell** (#DIV/0!, #REF!) rather than silently
+  ingesting "#DIV/0!" as data (financial safety). xlsx isn't byte-deterministic (zip + timestamps),
+  so it's tested by **round-trip** (emit→re-ingest recovers canonical) plus typed-cell / formula-result
+  / error-cell / non-binary-payload cases. 130 tests green (stable ×4), build clean. Note: 25 npm-audit
+  vulns are pre-existing dev-toolchain (nest cli/jest), not runtime/exceljs. **Phase 2 remaining:**
+  transport adapters (SFTP/webhook — credential-dependent), AK3/AK4 error detail.
+
+### 2026-08-01 — Phase 2: emit-side reverse transforms (round-trip symmetry)
+
+- **D64. Emit-side transforms built — round-trip symmetry closed.** Ingest applied transform chains
+  but emit did not, so any relationship using unit conversions couldn't convert back on the outbound
+  leg. Added `ConnectorFieldMap.emitTransform?: TransformSpec[]` — an **explicit** reverse chain,
+  applied in `ObjectMapper.emit` (via `formatField`, before decimal formatting — the mirror of
+  ingest's transform-then-coerce). **Design decision (financial safety):** emit transforms are
+  authored explicitly, NOT auto-inverted from `transform` — several ops are lossy (round/trim/upper/
+  lower can't be undone) so auto-inversion would silently corrupt money/quantities. Added
+  `divideByLookup` op (reverse of `multiplyByLookup`: eaches→cases ÷ packSize) with a **zero-divisor
+  guard** (a 0/invalid pack size → Infinity would silently corrupt a quantity → throws instead).
+  `formatField` now receives the canonical `source` record so lookup ops can resolve their key.
+  Tests: `divideByLookup` (+ zero-guard) in transforms.spec; a full **round-trip** test in
+  object-mapper.spec (canonical 60 eaches CA @ $18.50 → native 5 cases CS @ 1850¢ via
+  divideByLookup + reverse crossref + ×100). 125 tests green (stable ×3), build clean. Reverse crossref
+  uses a separate canonical→source table (directional, admin-authored) — no bijectivity assumption.
+  **Phase 2 remaining:** transport adapters (SFTP/webhook — credential-dependent), xlsx, AK3/AK4
+  error detail.
+
+### 2026-08-01 — Phase 2: 997 Functional Acknowledgment generation
+
+- **D63. 997 acknowledgment generator built (`src/ack/`).** `FunctionalAckService.buildBody(req)` is a
+  pure `(AckRequest) → RawSegment[]` that emits the 997 body (AK1 · per-TS AK2/AK5 · AK9) for a
+  received functional group; the control plane envelopes it (GS01='FA', ST01='997', sender/receiver
+  swapped, fresh control numbers) via the existing EnvelopeService. Ack-code logic: **AK501** per TS =
+  `A` (accepted) / `R` (rejected) from conformance validity; **AK901** group = `A` all accepted,
+  `R` none accepted / empty-or-malformed group, `P` partially accepted. **AK9 counts**: AK902 =
+  included (GE01 as *claimed* by sender, defaults to received), AK903 = received, AK904 = accepted —
+  so an envelope count mismatch surfaces as AK902≠AK903. Identifiers (group control #, TS control #)
+  are echoed **verbatim** (leading zeros preserved — a compliance requirement). Throws rather than
+  emit an unidentifiable ack (missing functionalIdCode/groupControlNumber/TS code/control#). Wired
+  into AppModule (`AckModule`). 8 tests cover the full A/R/P matrix + count mismatch + empty group +
+  throw-guards + an **end-to-end** test (body → enveloped FA/997 interchange, verifies sender/receiver
+  swap, GS01=FA, ST01=997, SE count, deterministic serialization). 122 tests green (stable ×3), build
+  clean. **Deferred (documented):** per-segment/element error detail (AK3/AK4 + AK502–506 syntax error
+  codes) — M1 acknowledges at TS granularity; and wiring intake→validate→997 as one automatic reply
+  flow (needs the transport layer to actually send it back). **Phase 2 remaining:** transport adapters
+  (SFTP/webhook — credential-dependent), xlsx, emit-side reverse transforms, AK3/AK4 error detail.
+
+### 2026-08-01 — Phase 2: inbound intake lifecycle (immutable retention + idempotent dedup)
+
+- **D62. Intake trust boundary built (`src/intake/`).** Every inbound payload — from any transport —
+  now enters through `InboundGateway.receive(source, bytes, receivedAt)` BEFORE the engine sees it.
+  Order of operations is deliberate for financial safety: **(1) retain raw immutably first** (a
+  malformed payload is still kept — `RawArtifactStore`, content-addressed by sha256, append-only, no
+  update/delete, first-write-wins), **(2) derive the interchange identity** (dedup key = X12
+  sender+receiver+ICN, ISA05–08+ISA13 — robust to line-ending/whitespace differences on a genuine
+  resend; falls back to `sha256:<hash>` for non-X12 payloads e.g. connector JSON), **(3) atomic
+  check-and-record** (`DedupStore.register` is a single op returning post-increment state — a
+  check-then-set gap would let the same interchange process twice under concurrency; DB impl uses an
+  upsert/unique constraint). Returns an `IntakeReceipt` with `status: accepted|duplicate`,
+  `occurrence`, `firstSeenAt`, and — critically — **`conflict`**: true when the same interchange
+  identity arrives with DIFFERENT *normalized* content (reused ICN / tampered replay) → caller must
+  quarantine for human review, never silently skip. **A test caught a real design flaw:** conflict
+  was first computed from raw byte hashes, so a partner merely varying line endings on a legit resend
+  would false-positive as a conflict (quarantine noise). Fixed by comparing a **normalized
+  fingerprint** = `sha256(x12.serialize(parse(bytes)))` (whitespace collapses, business values don't).
+  Stores bound to in-memory impls behind abstract classes (`IntakeModule`, wired into `AppModule`) —
+  disk/S3/DB swaps in without touching the gateway; a microservice-extraction seam. 8 intake tests
+  cover: accept+retain, benign byte-identical resend, whitespace-only resend (no conflict), reused-ICN
+  conflict, distinct ICNs independent, non-X12 content-hash fallback, empty payload retained, atomic
+  ledger count. 114 tests green (stable ×3), build clean. **Phase 2 remaining:** transport adapters
+  (SFTP/webhook — credential-dependent), 997 acknowledgment generation end-to-end, xlsx, emit-side
+  reverse transforms.
+
+### 2026-08-01 — Phase 2: platform connectors (Shopify / Amazon / QuickBooks)
+
+- **D61. Platform connector adapters built (translate-only; live transport deferred).** Added a
+  `PayloadConnector` base (`adapters/payload-connector.base.ts`) for JSON-payload connectors: ingest
+  validates an object payload → delegates to ObjectMapper → stamps `tenantId`; emitData delegates to
+  `mapper.emit`; self-registers into ConnectorRegistry. Subclasses add only platform identity +
+  a shipped default connector-map template: `ShopifyConnector`/`SHOPIFY_ORDER_TEMPLATE` (order→850),
+  `AmazonConnector`/`AMAZON_ORDER_TEMPLATE` (SP-API order→850, nested `ItemPrice.Amount`),
+  `QuickBooksConnector`/`QUICKBOOKS_INVOICE_TEMPLATE` (invoice→810, deep `SalesItemLineDetail.*`).
+  `GenericRestConnector` refactored onto the same base. Five connectors now register via DI
+  (flat-file, generic-rest, shopify, amazon, quickbooks). **⚠️ Deliberately NOT built: live
+  OAuth/API fetch+push** — that's the transport layer and cannot be truthfully built/tested without
+  real accounts/credentials; these adapters translate a PROVIDED payload only. **A DI smoke test
+  caught a real production bug:** the base constructor called `registry.register(this)` before the
+  subclass `readonly type = '...'` field initialized (JS runs subclass field initializers AFTER
+  super()), so every payload connector registered under `type === undefined` and collapsed to a
+  single surviving entry — in the app graph `registry.get('shopify')` would have thrown. Fixed by
+  passing `type` as a base-constructor parameter property (assigned before the body). Added
+  `platform-connectors.spec.ts` (payload→canonical per template) + `connectors.module.spec.ts`
+  (boots real ConnectorsModule, asserts all 5 register distinctly). 106 tests green (stable ×4),
+  `nest build` clean. **Phase 2 remaining:** transport/lifecycle (SFTP/webhook intake, raw
+  retention, dedup, 997 end-to-end), xlsx, emit-side reverse transforms.
+
+### 2026-08-01 — Phase 2: transform/lookup operators + reference-data (unit conversions)
+
+- **D60. Unit-conversion capability built** — the "real work" flagged in D57. `reference-data/`
+  (ReferenceDataStore: crossRef value→value + enrichment key→record; both THROW on missing = financial
+  safety; own module, reusable by both edges). `connectors/transforms.ts` — fixed function library (NO
+  arbitrary code): multiply/divide/round/trim/upper/lower + `crossref` (code normalization e.g. UOM
+  CS→CA) + `multiplyByLookup` (cases→eaches × packSize from item master). ConnectorFieldMap gains
+  `transform?: TransformSpec[]` (ordered chain, applied on ingest before decimal coercion). ObjectMapper
+  injects ReferenceDataStore (optional default for tests). The flat-file unit-conversion example now works
+  end-to-end (5 cases×12=60 eaches, CS→CA, 1850¢÷100=$18.50). **Property/unit test caught a real float
+  bug** (round '1.005'→1.00 via Math.round) → fixed with decimal.js (→1.01). 101 tests green (stable ×6),
+  build+DI OK. Note: transforms apply on INGEST; emit-side reverse transforms deferred. **Phase 2
+  remaining:** transport/lifecycle (SFTP/webhook intake, raw retention, dedup, 997 end-to-end), platform
+  connector (Shopify), xlsx.
+
+- **D59. Connectors now flow end-to-end through the engine (both directions).** Added: `ObjectMapper.emit`
+  (canonical→native, reverse codec — flat rows or nested object, `applyDecimal` re-formats); `Connector.emitData`
+  on flat-file (canonical→CSV, minimal RFC writer) + generic-rest (canonical→JSON); `RelationshipDocument.
+  connectorInstanceId` (customer-edge binding); `control-plane/connector-instance-store.ts`; `control-plane/
+  integration-orchestrator.ts` — **the top of the control plane composing connector↔canonical↔engine at the
+  canonical boundary**: `receiveFromCustomer` (native → validated X12 interchange) + `deliverToCustomer` (X12 →
+  native). Decoupling fix: `ConnectorDescriptor` made standalone so connectors don't import control-plane (no
+  cycle; control-plane→connectors one-way). Headline test: a customer **CSV → connector → canonical → engine →
+  validated X12 interchange**, and back (X12 → canonical → CSV) — all driven by `TradingRelationship` config.
+  93 tests green (stable ×6), build+DI OK. **Phase 2 remaining:** transform/lookup operators + reference-data
+  subsystem (unit conversions), transport/lifecycle (SFTP/webhook intake, raw retention, dedup, 997 end-to-end),
+  platform connector (Shopify), xlsx.
+
+- **D58a. Admin-console spec consolidated** (`docs/design/admin-console.md` rewritten): principles
+  (config-studio-not-canvas, grid-not-dragdrop, AI-drafts-human-reviews, source-liberal/canonical-strict,
+  no-arbitrary-code, guided/validated, admin-first) + surfaces (palette, relationship studio topology,
+  connector config w/ vault, mapping grid tiered liberty, AI onboarding, sandbox, observability, spec/IG)
+  + backend provisions already in place + still-to-build + a **do-not-miss checklist**. So console
+  pointers aren't lost before the launch build.
+- **D58b. Phase 2 connector CORE built** (`platform/src/connectors/`): `connector.types.ts` (Connector
+  interface, ConnectorInstance, ConnectorMap — declarative), `object-mapper.ts` (customer-edge codec
+  native→canonical, reuses mapping/ path+coerce operators), `connector-registry.ts` (self-registration +
+  `list()` catalog), `adapters/flat-file.connector.ts` (CSV via csv-parse + parse-config + BOM/quoted-field
+  handling), `adapters/generic-rest.connector.ts` (JSON→canonical, nested lineOver). Connectors
+  self-register at startup (verified: ['flat-file','generic-rest']). 86 tests green (stable ×6), build+DI
+  OK. **Still to build (Phase 2):** emit-data (canonical→native), transform/lookup operators + reference-
+  data subsystem (unit conversions), transport/lifecycle (SFTP/webhook intake, raw retention, dedup, 997
+  orchestration end-to-end), pipeline integration (connectors ↔ TranslationPipeline), platform connector
+  (Shopify per beachhead), xlsx.
+
+- **D57. Edge cases + console liberty for connectors** (`connector-layer.md` §7c/§7d). Edge cases:
+  cross-cutting (auth refresh, idempotency/dedup on webhook-retry+re-poll, partial-batch per-record
+  errors, missed-delivery reconciliation poll, rate-limit/pagination/backoff, SCHEMA DRIFT detect+fail-
+  loud, encoding/TZ, raw retention) + per-class (file: leading-zero SKUs, sci-notation, embedded
+  delimiters, date ambiguity, multi-sheet, footer rows; api: pagination/signature/versioning; ecommerce:
+  order edits/cancels/refunds, multi-currency, kits, SP-API SigV4+async feeds; erp: oauth/upsert/conflicts;
+  db: CDC lag/migrations). Per-connector exhaustive enumeration + golden/property tests + sandbox
+  validation at BUILD time; sandbox-with-real-samples is what catches them pre-prod. Console mapping
+  liberty = TIERED: T0 AI-draft (all) → T1 grid point-and-click rebind/type/cross-ref (operators) → T2
+  fixed transform palette (÷100, ×pack-lookup, trim…) → T3 declarative DSL (admin/advanced only). KEY
+  asymmetry: SOURCE-liberal (any column/transform/lookup), CANONICAL-strict (fixed governed schema, map
+  INTO it, one-offs→extensions = the moat). Always-on: live validation, required-field check, live
+  preview, no-save-on-fail. No arbitrary code ever (fixed function library).
+
+- **D56. Connector layer architecture** (`docs/design/connector-layer.md`, design only — not built).
+  Connectors = customer edge = the Ingest-data/Emit-data primitives, mirroring the engine's
+  Emit-EDI/Ingest-EDI on the partner edge. **Shared interface with the engine = THE CANONICAL
+  DOCUMENT** — connectors expose `ingestData()→CanonicalDocument[]` and `emitData(docs)`; the
+  TranslationPipeline composes connector↔canonical↔engine at the canonical boundary; neither imports
+  the other (engine stays pure). Two codecs, one hub: X12 map-engine (segment/pos) on partner edge,
+  connector/object-mapper (field-path) on customer edge — different DSLs, both target canonical,
+  share operator lib + validation/sandbox/AI/grid machinery. Connector = thin adapter (transport+
+  auth+trigger) + declarative connector-map + ConnectorInstance config (creds→vault). Types: file /
+  generic-API / e-commerce (Shopify/Amazon SP-API/Walmart) / ERP (QBO/NetSuite/BC/Odoo) / database.
+  v1 top-5: flat-file, generic-REST, Shopify, Amazon SP-API, QuickBooks. Console: ConnectorRegistry
+  `list()`→palette; connector = customer-edge node in fixed 3-zone topology; instance-config form w/
+  guided OAuth→vault; connector-map = same spreadsheet review grid (AI-draftable); per-connector
+  observability. Build scope: Connector SDK/registry + object-mapper + transport/lifecycle + top-5.
 
 - **D54. Control plane done — the composition layer that governs the pure engine.** `platform/src/
   control-plane/`: `config.types.ts` (declarative TradingRelationship + RelationshipDocument +

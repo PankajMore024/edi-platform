@@ -81,7 +81,7 @@ export class TranslationPipeline {
 
   /** Validate the body against the governing spec (if configured). Authority decides accountability. */
   private validateBody(body: RawSegment[], rd: RelationshipDocument): ConformanceResult {
-    if (!rd.specId) return { valid: true, errors: [] };
+    if (!rd.specId) return { valid: true, errors: [], issues: [] };
     return this.validator.validate(body, this.specs.get(rd.specId));
   }
 

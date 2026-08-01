@@ -61,4 +61,34 @@ describe('ConformanceValidator (house-format 850)', () => {
     const r = validator.validate(segs, HOUSE_850);
     expect(r.errors.join(' ')).toMatch(/CTT occurs 2× \(max 1\)/);
   });
+
+  describe('structured issues (for 997 AK3/AK4)', () => {
+    it('element issue carries tag, segment position, element position + AK403 code', () => {
+      const segs = body();
+      segs.find((s) => s.tag === 'BEG')!.elements[1] = 'ZZ'; // BEG02 bad code
+      const begPos = segs.findIndex((s) => s.tag === 'BEG') + 1;
+      const r = validator.validate(segs, HOUSE_850);
+      const issue = r.issues.find((i) => i.segmentTag === 'BEG' && i.elementPosition === 2);
+      expect(issue).toMatchObject({ level: 'element', segmentPosition: begPos, elementPosition: 2, errorCode: '7', badValue: 'ZZ' });
+    });
+
+    it('non-numeric → AK403 code 6 (invalid character); over-length → 4; too-short → 5', () => {
+      const segs = body();
+      segs.find((s) => s.tag === 'PO1')!.elements[1] = 'abc';
+      const r = validator.validate(segs, HOUSE_850);
+      expect(r.issues.find((i) => i.segmentTag === 'PO1' && i.elementPosition === 2)?.errorCode).toBe('6');
+    });
+
+    it('unexpected segment → segment-level AK304 code 2 at its received position', () => {
+      const segs = [...body(), { tag: 'ZZ', elements: ['x'] }];
+      const r = validator.validate(segs, HOUSE_850);
+      expect(r.issues.find((i) => i.segmentTag === 'ZZ')).toMatchObject({ level: 'segment', errorCode: '2', segmentPosition: segs.length });
+    });
+
+    it('missing mandatory segment → AK304 code 3 with position 0 (absent)', () => {
+      const segs = body().filter((s) => s.tag !== 'CTT');
+      const r = validator.validate(segs, HOUSE_850);
+      expect(r.issues.find((i) => i.segmentTag === 'CTT')).toMatchObject({ level: 'segment', errorCode: '3', segmentPosition: 0 });
+    });
+  });
 });
