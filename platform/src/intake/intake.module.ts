@@ -3,6 +3,7 @@ import { X12Module } from '../x12/x12.module';
 import { InboundGateway } from './inbound-gateway';
 import { RawArtifactStore, InMemoryRawArtifactStore } from './raw-artifact.store';
 import { DedupStore, InMemoryDedupStore } from './dedup.store';
+import { ProcessingLedger, InMemoryProcessingLedger } from './processing-ledger';
 
 /**
  * Intake — the inbound trust boundary (immutable raw retention + idempotent dedup). Stores are bound
@@ -15,7 +16,8 @@ import { DedupStore, InMemoryDedupStore } from './dedup.store';
     InboundGateway,
     { provide: RawArtifactStore, useClass: InMemoryRawArtifactStore },
     { provide: DedupStore, useClass: InMemoryDedupStore },
+    { provide: ProcessingLedger, useClass: InMemoryProcessingLedger },
   ],
-  exports: [InboundGateway, RawArtifactStore, DedupStore],
+  exports: [InboundGateway, RawArtifactStore, DedupStore, ProcessingLedger],
 })
 export class IntakeModule {}

@@ -3,6 +3,9 @@ import { Injectable } from '@nestjs/common';
 /** What the dedup store remembers about one interchange identity. */
 export interface DedupRecord {
   key: string;
+  /** Raw artifact id (content hash) of the FIRST occurrence — lets a conflict/duplicate be traced
+   * back to the original retained bytes for operator review. */
+  firstArtifactId: string;
   /**
    * Normalized-content fingerprint of the FIRST occurrence. Comparing a later occurrence's
    * fingerprint against this detects same-identity/different-CONTENT conflicts, while ignoring
@@ -22,7 +25,7 @@ export interface DedupRecord {
  * twice under concurrency). A DB impl backs this with an upsert / unique constraint.
  */
 export abstract class DedupStore {
-  abstract register(key: string, fingerprint: string, at: Date): DedupRecord;
+  abstract register(key: string, artifactId: string, fingerprint: string, at: Date): DedupRecord;
   abstract lookup(key: string): DedupRecord | undefined;
 }
 
@@ -30,7 +33,7 @@ export abstract class DedupStore {
 export class InMemoryDedupStore extends DedupStore {
   private readonly records = new Map<string, DedupRecord>();
 
-  register(key: string, fingerprint: string, at: Date): DedupRecord {
+  register(key: string, artifactId: string, fingerprint: string, at: Date): DedupRecord {
     const existing = this.records.get(key);
     if (existing) {
       existing.occurrences += 1;
@@ -38,6 +41,7 @@ export class InMemoryDedupStore extends DedupStore {
     }
     const record: DedupRecord = {
       key,
+      firstArtifactId: artifactId,
       firstFingerprint: fingerprint,
       firstSeenAt: at.toISOString(),
       occurrences: 1,

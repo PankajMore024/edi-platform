@@ -69,6 +69,41 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 2: inbound pipeline (the receive backbone, end-to-end)
+
+- **D68. `InboundPipeline` wires the whole receive loop into one orchestrated, safety-gated path.**
+  `receive(rel, source, bytes, receivedAt)` composes the already-hardened pieces: intake gateway
+  (retain + dedup) → envelope parse → translation pipeline (translate + validate) → customer connector
+  (deliver) → 997 generator. Returns `{ outcome, receipt, docType?, delivered?, validation?, ack? }`
+  with four outcomes and their gates:
+  - **accepted** — conformant → delivered to the customer connector + 997 (AK9 `A`).
+  - **rejected** — non-conformant → **NOT delivered** (a bad doc is never pushed into the customer
+    system) + 997 (AK9 `R`, AK5 `R`/`5`, AK3/AK4 detail from the structured issues).
+  - **duplicate** — idempotent skip (no re-delivery, no re-ack).
+  - **conflict** — same interchange identity, different content → quarantined, not processed, no ack
+    (auto-processing a reused-ICN/tampered replay is the exact financial-loss case).
+  Refactored `IntegrationOrchestrator.deliverToCustomer` to expose `deliverDoc(rel, docType, doc)` so
+  the pipeline delivers an already-translated doc only when valid, without re-translating. The 997 is
+  enveloped as our outbound FA/997 to the partner (rel.envelope + shared control-number sequence);
+  actual dispatch via transport is the deferred live step — the pipeline returns the ack. Wired into
+  ControlPlaneModule (added X12Module/IntakeModule/AckModule imports). 4 end-to-end tests (one per
+  outcome, built from a genuinely emitted+corrupted interchange).
+
+- **D68a. Processing ledger — nothing is dropped unattended.** Prompted by user: duplicates/conflicts
+  must be captured with a visible lifecycle, not silently skipped. Added `ProcessingLedger` (append-only
+  audit log; `src/intake/processing-ledger.ts`) — the InboundPipeline writes exactly ONE
+  `ProcessingRecord` for EVERY outcome (accepted/rejected/duplicate/conflict) with artifact id, dedup
+  linkage, conformance summary, delivered flag, 997 control number, and a `needsReview` flag.
+  Queries: `list(filter)`, `timeline(dedupKey)` (a document's full history under one interchange
+  identity), `needingReview()` (the operator queue — conflicts + rejects). Restored `firstArtifactId`
+  on DedupRecord/IntakeReceipt (alongside the normalized fingerprint) so a conflict/duplicate links to
+  the ORIGINAL retained bytes; the conflicting bytes are themselves retained (content-addressed store),
+  so an operator can pull BOTH versions to compare. A conflict is quarantined (`needsReview`), never
+  auto-processed. 161 tests green (stable ×3), build clean. **Remaining before this loop is fully
+  live:** transport dispatch of the 997 (credential-dependent), multi-group/multi-TS interchanges
+  (envelope parse is single-group M1), TA1 interchange-level ack for conflicts, and a
+  quarantine-resolution workflow (operator accept/reject/reprocess a reviewed event).
+
 ### 2026-08-02 — Phase 2: transport axis + connector split (csv/xlsx/database) + SFTP/webhook stubs
 
 - **D67. Transport and format made ORTHOGONAL axes; file connector split; DB connector + transport

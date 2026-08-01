@@ -30,6 +30,9 @@ export interface IntakeReceipt {
   status: IntakeStatus;
   /** Logical interchange key (sender+receiver+ICN) or `sha256:<hash>` when the envelope is unparseable. */
   dedupKey: string;
+  /** Raw artifact id of the FIRST occurrence of this identity. For a duplicate it equals `artifact.id`;
+   * for a conflict it points at the ORIGINAL retained bytes so an operator can compare the two. */
+  firstArtifactId: string;
   /** ISO timestamp when this dedupKey was first accepted. */
   firstSeenAt: string;
   /** 1 for the first occurrence, 2+ for repeats. */

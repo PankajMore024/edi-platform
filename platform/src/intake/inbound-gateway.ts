@@ -30,7 +30,7 @@ export class InboundGateway {
     const { key, fingerprint } = this.identify(bytes, artifact.id);
 
     // 3. Atomic check-and-record on the identity.
-    const record = this.dedup.register(key, fingerprint, receivedAt);
+    const record = this.dedup.register(key, artifact.id, fingerprint, receivedAt);
 
     const status = record.occurrences === 1 ? 'accepted' : 'duplicate';
     // Same interchange identity but different NORMALIZED content = NOT a benign resend. Surface it.
@@ -41,6 +41,7 @@ export class InboundGateway {
       artifact,
       status,
       dedupKey: key,
+      firstArtifactId: record.firstArtifactId,
       firstSeenAt: record.firstSeenAt,
       occurrence: record.occurrences,
       conflict,

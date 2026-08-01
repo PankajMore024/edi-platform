@@ -4,6 +4,7 @@ import { TranslationPipeline, EmitResult } from './translation-pipeline';
 import { ConnectorInstanceStore } from './connector-instance-store';
 import { DocType, RelationshipDocument, TradingRelationship } from './config.types';
 import { ConformanceResult } from '../validation/conformance-validator';
+import { CanonicalDocument } from '../canonical/types/document.types';
 
 export interface DeliverResult {
   docType: string;
@@ -37,11 +38,20 @@ export class IntegrationOrchestrator {
   /** Partner → Customer: an X12 interchange → native payload delivered into the customer system. */
   async deliverToCustomer(rel: TradingRelationship, interchange: Parameters<TranslationPipeline['ingestDocument']>[1]): Promise<DeliverResult> {
     const res = this.pipeline.ingestDocument(rel, interchange);
-    const rd = this.findDoc(rel, res.docType as DocType, 'inbound');
+    const native = await this.deliverDoc(rel, res.docType as DocType, res.doc);
+    return { docType: res.docType, native, validation: res.validation };
+  }
+
+  /**
+   * Deliver an ALREADY-translated canonical document to the customer's connector. Split out so the
+   * inbound pipeline can gate delivery on validation (never push a non-conformant doc into the
+   * customer system) without re-translating.
+   */
+  async deliverDoc(rel: TradingRelationship, docType: DocType, doc: CanonicalDocument): Promise<unknown> {
+    const rd = this.findDoc(rel, docType, 'inbound');
     const instance = this.instances.get(this.requireConnector(rd));
     const connector = this.connectors.get(instance.connectorType);
-    const native = await connector.emitData(res.doc, instance);
-    return { docType: res.docType, native, validation: res.validation };
+    return connector.emitData(doc, instance);
   }
 
   private requireConnector(rd: RelationshipDocument): string {
