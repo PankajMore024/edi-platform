@@ -50,7 +50,7 @@ export const SAMPLE_MAP: EdiMap = {
           segment: 'PO1',
           elements: [
             { pos: 1, path: 'lineNumber' },
-            { pos: 2, path: 'quantity.value' },
+            { pos: 2, path: 'quantity.value', decimal: 0 },
             { pos: 3, path: 'quantity.uom' },
             { pos: 4, path: 'unitPrice.amount', decimal: 2 },
             { pos: 7, path: 'ids.0.value', qualifier: { pos: 6, const: 'UP' } },
@@ -129,7 +129,7 @@ export const SAMPLE_810_MAP: EdiMap = {
           segment: 'IT1',
           elements: [
             { pos: 1, path: 'lineNumber' },
-            { pos: 2, path: 'quantity.value' },
+            { pos: 2, path: 'quantity.value', decimal: 0 },
             { pos: 3, path: 'quantity.uom' },
             { pos: 4, path: 'unitPrice.amount', decimal: 2 },
             { pos: 7, path: 'ids.0.value', qualifier: { pos: 6, const: 'UP' } },
@@ -197,7 +197,7 @@ export const SAMPLE_855_MAP: EdiMap = {
           segment: 'PO1',
           elements: [
             { pos: 1, path: 'lineNumber' },
-            { pos: 2, path: 'quantity.value' },
+            { pos: 2, path: 'quantity.value', decimal: 0 },
             { pos: 3, path: 'quantity.uom' },
             { pos: 4, path: 'unitPrice.amount', decimal: 2 },
             { pos: 7, path: 'ids.0.value', qualifier: { pos: 6, const: 'UP' } },
@@ -207,7 +207,7 @@ export const SAMPLE_855_MAP: EdiMap = {
           segment: 'ACK',
           elements: [
             { pos: 1, path: 'ackStatus' },
-            { pos: 2, path: 'quantity.value' },
+            { pos: 2, path: 'quantity.value', decimal: 0 },
             { pos: 3, path: 'quantity.uom' },
           ],
         },
@@ -264,7 +264,7 @@ export const SAMPLE_856_MAP: EdiMap = {
               segments: [
                 { segment: 'HL', elements: [{ pos: 1, hl: 'id' }, { pos: 2, hl: 'parent' }, { pos: 3, const: 'I' }] },
                 { segment: 'LIN', elements: [{ pos: 1, path: 'lineNumber' }, { pos: 2, const: 'UP' }, { pos: 3, path: 'ids.0.value' }] },
-                { segment: 'SN1', elements: [{ pos: 2, path: 'quantity.value' }, { pos: 3, path: 'quantity.uom' }] },
+                { segment: 'SN1', elements: [{ pos: 2, path: 'quantity.value', decimal: 0 }, { pos: 3, path: 'quantity.uom' }] },
               ],
             },
           ],

@@ -5,6 +5,8 @@ import { CanonicalModule } from './canonical/canonical.module';
 import { X12Module } from './x12/x12.module';
 import { EnvelopeModule } from './envelope/envelope.module';
 import { MappingModule } from './mapping/mapping.module';
+import { ValidationModule } from './validation/validation.module';
+import { ControlPlaneModule } from './control-plane/control-plane.module';
 
 /**
  * Root module.
@@ -25,6 +27,10 @@ import { MappingModule } from './mapping/mapping.module';
     X12Module,
     EnvelopeModule,
     MappingModule,
+    ValidationModule,
+
+    // Control plane — config that governs the engine (composes the pure cores)
+    ControlPlaneModule,
   ],
 })
 export class AppModule {}

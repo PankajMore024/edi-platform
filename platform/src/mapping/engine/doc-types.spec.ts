@@ -28,9 +28,9 @@ describe('engine is doc-type-agnostic (one engine, many doc types)', () => {
     const doc = ingest.ingest(emit.emit(SAMPLE_810_DOC, SAMPLE_810_MAP), SAMPLE_810_MAP) as any;
     expect(doc.invoiceNumber).toBe('INV-77');
     expect(doc.poNumber).toBe('4500');
-    expect(doc.totalAmount).toBe('405.00'); // wire form; coercion is the later step
+    expect(doc.totalAmount).toBe(405); // coerced to a number
     expect(doc.lineItems).toHaveLength(2);
-    expect(doc.lineItems[0].unitPrice.amount).toBe('18.50');
+    expect(doc.lineItems[0].unitPrice.amount).toBe(18.5); // coerced to a number
     expect(doc.inbound.unmapped).toEqual([]);
   });
 

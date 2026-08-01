@@ -3,6 +3,7 @@ import { EdiMap, MapNode, SegmentNode, isLoopNode, isSegmentNode } from '../dsl/
 import { CanonicalDocument } from '../../canonical/types/document.types';
 import { RawSegment } from '../../x12/x12.service';
 import { setPath } from './path';
+import { coerceElement } from './coerce';
 
 interface Cursor {
   i: number;
@@ -91,7 +92,7 @@ export class IngestService {
     for (const el of node.elements) {
       if (el.path === undefined) continue; // const/count are emit-only
       const v = seg.elements[el.pos - 1];
-      if (v !== undefined && v !== '') setPath(target, el.path, v);
+      if (v !== undefined && v !== '') setPath(target, el.path, coerceElement(v, el));
     }
   }
 }

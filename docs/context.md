@@ -69,6 +69,126 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-01 — Control plane BUILT (engine now governed by config) + console provisions
+
+- **D54. Control plane done — the composition layer that governs the pure engine.** `platform/src/
+  control-plane/`: `config.types.ts` (declarative TradingRelationship + RelationshipDocument +
+  format_authority + ComponentDescriptor — all JSON, no code), `map-registry.ts` (id-keyed, validates
+  via MapValidator on register, `list()` catalog), `spec-registry.ts`, `relationship-store.ts`,
+  `translation-pipeline.ts` (THE composition: relationship → select map+spec → engine → conformance-
+  validate per authority → envelope + control numbers). Engine/validator/envelope stay pure &
+  config-blind; the pipeline is the ONLY place that knows relationships. 5 tests incl. the headline
+  "engine governed by config" E2E (relationship → full validated interchange), a conformance-fail
+  case (bad UOM caught by pipeline), inbound round-trip, missing-config error, and catalog descriptors.
+  77 tests green (stable ×6), build+DI OK.
+- **D55. Admin-console provisions baked in NOW, per user (build later, ship for launch).**
+  `docs/design/admin-console.md`. Console = guided config studio + AI-onboarding GRID (not n8n canvas,
+  not drag-drop mapping), admin-first. Backend already console-ready: config-as-data, registries expose
+  `list(): ComponentDescriptor[]` catalog, id-keyed CRUD, pipeline driven by declarative config,
+  load-time validators, round-trippable relationship JSON, map JSON-schema for form-gen. Still to
+  build for launch: thin API over registries/pipeline/validators/AI-onboarding + more JSON-schemas +
+  the React frontend (studio, map-review grid, drop-samples onboarding, observability). No engine
+  change needed — presentation layer over the declarative control plane.
+
+- **D53. Visual workspace = config/onboarding CONSOLE, not an n8n runtime-flow canvas** (user
+  refined: workspace controls ONLY control plane + connectors + AI onboarding; runtime EDI flow stays
+  pure backend). Deep-research verdict (`docs/strategy/visual-workspace-feasibility.md`; synthesis
+  stubbed → pulled 60+ verified claims from journal): vision is SOUND. Key evidence-based refinements:
+  (1) **the map surface = a spreadsheet-style REVIEW GRID over AI-drafted maps (row per field:
+  segment/element/label/target) + DSL for the hard 20% — NOT drag-drop.** That's what TrueCommerce/
+  incumbents ship. (2) Pure-visual mapping insufficient; hybrid (visual+code) + engineering infra
+  (Git/versioning/tests) is the norm — our config-as-data-in-Git already provides this. (3) SMBs lean
+  MANAGED/turnkey; customer self-serve flow-building fights the market → workspace is ADMIN/onboarding-
+  first; self-serve gated + expert-backed later. (4) AI onboarding = complement (AI drafts→human
+  reviews) = our sandbox loop, AND now TABLE-STAKES (Orderful Mosaic + TrueCommerce agentic AI ship it
+  in 2026) → necessary not sufficient; moat stays dropship-native + whole-portfolio + catalog. (5)
+  Canonical hub validated (Orderful zero-mapping JSON, Stedi EDI→JSON). Retire: n8n free canvas,
+  default customer self-serve, standalone-iPaaS positioning. Recommendation unchanged: build composable
+  control-plane backend now; grid-based AI-review UI + guided config studio later (presentation layer).
+
+- **D52. ConformanceValidator (Layer-2) done — a pure sibling of the engine.** Decision (per user):
+  build validation BEFORE the control plane → keeps the "pure cores first, thin composition last"
+  architecture; validation is a pure `(segments, spec)→errors` primitive like the engine. Files in
+  `platform/src/validation/`: `spec.types.ts` (DocSpec/SegmentSpec/ElementSpec — requirement,
+  cardinality maxUse, type AN/N/R/ID/DT/TM, min/max len, code lists; owner=client|partner),
+  `specs/house850.ts` (house-format 850 — CLIENT-authored, so real reference data, no ANSI license
+  needed; matches what SAMPLE_MAP emits), `conformance-validator.ts`. Checks: unknown segments,
+  mandatory-segment presence + cardinality, per-element required/length/type(numeric,date)/codes.
+  Validates the transaction BODY (BEG…CTT), used both directions (outbound-before-send / inbound).
+  8 tests (accepts conformant 850; catches missing segment/element, bad code, non-numeric, over-length,
+  unexpected segment, cardinality). 72 tests green (stable ×6), build+DI OK. Scope note: strict
+  segment ORDER + loop-nesting validation deferred. NEXT: control plane (trading_relationship +
+  format_authority + edi_map registry + TranslationPipeline composing engine+validator+envelope),
+  which now composes two hardened pure cores.
+
+- **D51. Config model for onboarding** (`docs/design/onboarding-and-config.md`). The old fat
+  `kon_x12settings` splits into: `trading_relationship` (the spine — carries `format_authority`,
+  tenant_role, version, mode, spec_id), `envelope_config` (ISA/GS identity), `connection`
+  (transport + creds→vault), `edi_map` (the maps — now a per-tenant registry TABLE in the product,
+  vs JSON files in the prototype), `spec`/`ig` (governing reference data, owner=client|partner),
+  `relationship_document` (per-doc enablement + overrides). **Key: the boolean body-quirk flags
+  (is_td5/is_ctt/inc_vadd/is_sac_decimal/po_type…) do NOT become columns — they become MAP data**
+  (decimal:2, a `when`, a segment). **`format_authority` (D48) is the onboarding decision**, a field
+  on trading_relationship (per-doc override possible): dictated by the deal — client onboarding own
+  vendors = 'client'; client hit by a big-partner mandate = 'partner'. Onboarding order: partner →
+  relationship(+authority) → envelope → connection → spec → maps (AI-drafted in Phase 3). This model
+  guides the spec/IG registry build next (a spec has an owner; the relationship carries authority).
+
+- **D50. Coercion step done.** `platform/src/mapping/engine/coerce.ts` (inverse of format.ts):
+  map-driven — element `format` → ISO date, `decimal` → number; unmarked fields stay strings.
+  Ingest now yields TYPED canonical (numbers, ISO dates), not strings. Symmetric with emit →
+  **closes review finding #4** (formatDate re-emit crash gone; full round-trip `emit→ingest→emit`
+  now reproduces original bytes with NO stripping — stronger test). Convention adopted: numeric
+  elements declare `decimal` (0 for integers) — added `decimal:0` to quantity fields (output-neutral
+  on emit). Property tests prove emit/ingest are true inverses on the wire (formatDate∘parseX12Date
+  = id; applyDecimal∘parseDecimal = id). Property test caught a real bug: `Number('')` is 0 (silent
+  money bug) → parseDecimal now rejects empty. 64 tests green (stable ×8), build OK. Note: ingest
+  coercion currently THROWS on a malformed typed field (fail-loud); future = collect per-field errors.
+  Spine now well-hardened (validation + coercion + all review fixes). NEXT: spec/IG registry + Layer-2
+  (case-a house format), OR Phase 2 connectors + transport.
+
+- **D49. MapValidator (Layer-1 shape) done.** `platform/src/mapping/dsl/map-validator.ts`: (a) ajv
+  against `edi-map.schema.json` (runtime copy now in platform/, kept in lockstep with docs/ + map.types.ts),
+  (b) structural invariants ajv can't express — position uniqueness within a segment, `match` inbound-only,
+  `hl` elements only inside an hl loop. `validate()` → {valid, errors[]}; `assertValid()` throws. Provided/
+  exported from MappingModule; it's the LOAD-TIME GATE the future map registry + sandbox oracle will call
+  (and the safety gate the AI-map-generation loop needs). Explicitly SHAPE-only — NOT X12/IG conformance
+  (that's Layer-2 / D48). 57 tests green (stable ×8), build OK. NEXT: coercion step (ingest strings→typed
+  canonical), OR the spec/IG registry + Layer-2 (case-a house-format first, per D48), OR Phase 2 connectors.
+
+- **D48. Format authority is a first-class dimension (user requirement).** Two modes the product
+  MUST support, orthogonal to doc direction: **(a) CLIENT-AUTHORITATIVE** — our client defines the
+  format ("house format"), their partners comply (the user's proven old model, productized); we
+  validate the partner's INBOUND against our spec (partner at fault on failure) and can auto-publish
+  a partner-facing IG. **(b) PARTNER-AUTHORITATIVE** — client must comply with a bigger partner's IG
+  (the mandate case); we import their IG and validate our client's OUTBOUND against it BEFORE sending
+  (we're at fault → avoid chargeback). The reseller-in-the-middle is BOTH (authoritative to vendors,
+  compliant to big retailers). Engine/canonical/maps/sandbox UNCHANGED — this is the sandbox "both
+  ends" (D30) at the format level. New artifacts: a **spec/IG registry** where a spec is tagged
+  client-owned vs partner-owned, + a `formatAuthority` flag per trading relationship; validation
+  targets the accountable side. **Resolves the ANSI-sourcing concern (D-review):** case (a) = we
+  define the spec (no external standard needed); case (b) = the partner hands us their IG; raw ANSI
+  standard becomes optional sanity-reference, not a blocker. Build order: case (a) is easier for
+  Layer-2 conformance validation (we own the spec) + is the proven model → do it first; case (b)
+  needs a real partner IG. Validation layers (from prior turn): L1 map-shape (ajv, cheap, now) · L2
+  spec/IG conformance (this) · L3 partner-IG specifics (subsumed into the registry).
+
+### 2026-07-31 — Clean personal git repo set up + pushed
+
+- **D47. Committed to a fresh personal repo.** New remote `https://github.com/PankajMore024/edi-platform`
+  (separate repo, NOT EDI_ANSI_X12). Fresh history (old company `.git` backed up outside repo, recoverable),
+  repo-LOCAL personal identity (PankajMore024 / more.pankaj024@gmail.com) — global company identity in
+  `~/.gitconfig` untouched. **Clean scope:** committed only `platform/` + `docs/` + `.claude/` + `.github/ci.yml`
+  + README/.gitignore (85 files); old koneect app left on disk untracked (harvest reference). Security-verified
+  no `.env`/secrets/`storage`/partner-data/`node_modules` staged. Pushed `main` via one-time fine-grained PAT
+  (not persisted in config).
+- **EDI_ANSI_X12 finding:** the user's earlier personal repo (github.com/PankajMore024/EDI_ANSI_X12) is the SAME
+  koneect base + a squashed "multi-tenant SaaS" commit — Express/JS with tenancy models, REST API v1, Bull/Redis
+  queues, S3 storage, webhooks, API-key auth, rate limiting — but its CORE is STILL the hardcoded parsers (no
+  canonical/map engine). = SaaS PLUMBING on the old core. Complements our platform (clean core, no plumbing yet).
+  → harvest source for Phase 2–5 plumbing; do NOT adopt its core. ⚠️ It had `.env` committed and was briefly made
+  PUBLIC for this analysis → user must re-private + rotate those creds.
+
 ### 2026-07-31 — Full sell-side doc set complete (850/855/856/810/997)
 
 - **D46. The complete sell-side outbound set works through the one engine.** Added 855 (BAK +
