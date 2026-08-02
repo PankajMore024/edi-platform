@@ -28,6 +28,7 @@ import { createSchema } from '../db/migrations';
 import { RawArtifactRepository } from '../db/repositories/raw-artifact.repository';
 import { DedupRepository } from '../db/repositories/dedup.repository';
 import { ProcessingRepository } from '../db/repositories/processing.repository';
+import { TransactionRepository } from '../db/repositories/transaction.repository';
 
 /**
  * Slice-2 integration: the live InboundPipeline running against the DURABLE Kysely repositories
@@ -70,6 +71,7 @@ describe('InboundPipeline on durable repositories (node:sqlite)', () => {
   let orch: IntegrationOrchestrator;
   let ledger: ProcessingRepository;
   let raw: RawArtifactRepository;
+  let txns: TransactionRepository;
 
   beforeEach(async () => {
     db = createDatabase({ sqliteFile: ':memory:' });
@@ -83,9 +85,9 @@ describe('InboundPipeline on durable repositories (node:sqlite)', () => {
     const controlNumbers = new InMemoryControlNumberService();
     const pipeline = new TranslationPipeline(new EmitService(), new IngestService(), envelope, controlNumbers, new ConformanceValidator(), maps, specs);
     orch = new IntegrationOrchestrator(pipeline, connectors, instances);
-    raw = new RawArtifactRepository(db); ledger = new ProcessingRepository(db);
+    raw = new RawArtifactRepository(db); ledger = new ProcessingRepository(db); txns = new TransactionRepository(db);
     const gateway = new InboundGateway(raw, new DedupRepository(db), x12);
-    inbound = new InboundPipeline(gateway, x12, pipeline, orch, new FunctionalAckService(), envelope, controlNumbers, ledger);
+    inbound = new InboundPipeline(gateway, x12, pipeline, orch, new FunctionalAckService(), envelope, controlNumbers, ledger, txns);
   });
   afterEach(async () => { await db.destroy(); });
 
@@ -101,6 +103,18 @@ describe('InboundPipeline on durable repositories (node:sqlite)', () => {
     expect(events[0]).toMatchObject({ outcome: 'accepted', delivered: true, docType: '850' });
     // the raw bytes are retained and retrievable by content hash
     expect(await raw.get('t1', r.transactions[0].event.artifactId)).toBeDefined();
+
+    // the transaction itself is persisted as normalized rows, linked from the event, and reconstructs
+    const txnId = r.transactions[0].event.transactionId!;
+    const stored = await txns.get('t1', txnId);
+    expect(stored).toMatchObject({ docType: '850', currentState: 'DELIVERED', conformant: true, poNumber: '4500' });
+    const canon = stored!.canonical as any;
+    expect(canon.poNumber).toBe('4500');
+    expect(canon.lineItems).toHaveLength(1);
+    expect(canon.lineItems[0]).toMatchObject({ quantity: { value: 10, uom: 'EA' }, unitPrice: { amount: 18.5 } });
+    expect(canon.lineItems[0].ids[0].value).toBe('012345678905');
+    // queryable for dashboards without touching a blob
+    expect((await txns.list('t1', { state: 'DELIVERED' })).map((t) => t.poNumber)).toEqual(['4500']);
   });
 
   it('dedup persists across receives; conflict is recorded needing review', async () => {

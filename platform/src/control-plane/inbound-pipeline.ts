@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InboundGateway } from '../intake/inbound-gateway';
 import { IntakeReceipt, RawArtifact } from '../intake/intake.types';
 import { ProcessingLedger, ProcessingOutcome, ProcessingRecord } from '../intake/processing-ledger';
+import { TransactionStore } from '../intake/transaction-store';
+import { CanonicalDocument } from '../canonical/types/document.types';
 import { X12Service, RawSegment } from '../x12/x12.service';
 import { EnvelopeService, ControlNumbers, ParsedGroup, ParsedTransactionSet } from '../envelope/envelope.service';
 import { ControlNumberService } from '../envelope/control-number.service';
@@ -91,6 +93,7 @@ export class InboundPipeline {
     private readonly envelope: EnvelopeService,
     private readonly controlNumbers: ControlNumberService,
     private readonly ledger: ProcessingLedger,
+    private readonly txnStore: TransactionStore,
   ) {}
 
   async receive(rel: TradingRelationship, source: string, bytes: string, receivedAt: Date): Promise<InboundResult> {
@@ -157,7 +160,7 @@ export class InboundPipeline {
 
     for (const group of groups) {
       // Translate + validate + deliver each set first, then build the group's single 997.
-      const processed = [] as Array<{ ts: ParsedTransactionSet; conformant: boolean; delivered: boolean; deliveredPayload?: unknown; validation: ConformanceResult }>;
+      const processed = [] as Array<{ ts: ParsedTransactionSet; conformant: boolean; delivered: boolean; deliveredPayload?: unknown; validation: ConformanceResult; doc: CanonicalDocument }>;
       for (const ts of group.transactionSets) {
         const ingest = this.pipeline.ingestBody(rel, ts.transactionSetCode as DocType, ts.body);
         const conformant = ingest.validation.valid;
@@ -167,7 +170,7 @@ export class InboundPipeline {
           deliveredPayload = await this.orchestrator.deliverDoc(rel, ingest.docType as DocType, ingest.doc);
           delivered = true;
         }
-        processed.push({ ts, conformant, delivered, deliveredPayload, validation: ingest.validation });
+        processed.push({ ts, conformant, delivered, deliveredPayload, validation: ingest.validation, doc: ingest.doc });
       }
 
       const ack = await this.buildGroupAck(rel, group, processed, timestamp);
@@ -176,7 +179,20 @@ export class InboundPipeline {
       // Record one lifecycle event per transaction set, carrying its identity + this group's ack ref.
       for (const p of processed) {
         const outcome: InboundOutcome = p.conformant ? 'accepted' : 'rejected';
+        // Persist the transaction itself (canonical → normalized rows) — a bad doc is stored too, in
+        // REJECTED state, so it's queryable for review/debugging; it just wasn't delivered.
+        const transactionId = await this.txnStore.save({
+          tenantId: rel.tenantId, relationshipId: rel.id, direction: 'inbound',
+          docType: p.ts.transactionSetCode, transactionControlNumber: p.ts.controlNumber,
+          functionalGroupControlNumber: group.groupControlNumber, doc: p.doc,
+          currentState: p.conformant ? 'DELIVERED' : 'REJECTED', conformant: p.conformant,
+          reason: p.conformant ? undefined : p.validation.errors.join('; '),
+          receivedAt: ctx.receivedAt, validatedAt: timestamp.toISOString(),
+          deliveredAt: p.delivered ? timestamp.toISOString() : undefined,
+          acknowledgedAt: timestamp.toISOString(),
+        });
         const event = await this.logEvent(rel, ctx, outcome, {
+          transactionId,
           docType: p.ts.transactionSetCode,
           functionalGroupControlNumber: group.groupControlNumber,
           transactionControlNumber: p.ts.controlNumber,

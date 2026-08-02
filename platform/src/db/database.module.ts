@@ -9,6 +9,7 @@ import { ProcessingRepository } from './repositories/processing.repository';
 import { ControlNumberRepository } from './repositories/control-number.repository';
 import { RelationshipRepository } from './repositories/relationship.repository';
 import { DocSpecRepository, PartnerMapRepository, ConnectorMapRepository, TransportInstanceRepository } from './repositories/config-repositories';
+import { TransactionRepository } from './repositories/transaction.repository';
 
 /**
  * Provides the shared Kysely connection + durable repositories, and bootstraps the schema on startup.
@@ -27,11 +28,12 @@ import { DocSpecRepository, PartnerMapRepository, ConnectorMapRepository, Transp
     { provide: PartnerMapRepository, useFactory: (db: Kysely<DB>) => new PartnerMapRepository(db), inject: [DATABASE] },
     { provide: ConnectorMapRepository, useFactory: (db: Kysely<DB>) => new ConnectorMapRepository(db), inject: [DATABASE] },
     { provide: TransportInstanceRepository, useFactory: (db: Kysely<DB>) => new TransportInstanceRepository(db), inject: [DATABASE] },
+    { provide: TransactionRepository, useFactory: (db: Kysely<DB>) => new TransactionRepository(db), inject: [DATABASE] },
   ],
   exports: [
     DATABASE, RawArtifactRepository, DedupRepository, ProcessingRepository,
     ControlNumberRepository, RelationshipRepository, DocSpecRepository, PartnerMapRepository,
-    ConnectorMapRepository, TransportInstanceRepository,
+    ConnectorMapRepository, TransportInstanceRepository, TransactionRepository,
   ],
 })
 export class DatabaseModule implements OnModuleInit, OnModuleDestroy {

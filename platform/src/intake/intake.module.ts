@@ -4,9 +4,11 @@ import { InboundGateway } from './inbound-gateway';
 import { RawArtifactStore } from './raw-artifact.store';
 import { DedupStore } from './dedup.store';
 import { ProcessingLedger } from './processing-ledger';
+import { TransactionStore } from './transaction-store';
 import { RawArtifactRepository } from '../db/repositories/raw-artifact.repository';
 import { DedupRepository } from '../db/repositories/dedup.repository';
 import { ProcessingRepository } from '../db/repositories/processing.repository';
+import { TransactionRepository } from '../db/repositories/transaction.repository';
 
 /**
  * Intake — the inbound trust boundary (immutable raw retention + idempotent dedup + lifecycle ledger).
@@ -21,7 +23,8 @@ import { ProcessingRepository } from '../db/repositories/processing.repository';
     { provide: RawArtifactStore, useExisting: RawArtifactRepository },
     { provide: DedupStore, useExisting: DedupRepository },
     { provide: ProcessingLedger, useExisting: ProcessingRepository },
+    { provide: TransactionStore, useExisting: TransactionRepository },
   ],
-  exports: [InboundGateway, RawArtifactStore, DedupStore, ProcessingLedger],
+  exports: [InboundGateway, RawArtifactStore, DedupStore, ProcessingLedger, TransactionStore],
 })
 export class IntakeModule {}

@@ -69,6 +69,27 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 2: transaction persistence — canonical ⇄ normalized rows [DB slice 4]
+
+- **D75. The pipeline now persists each processed transaction as NORMALIZED rows (no blob).** Added
+  `TransactionStore` (abstract; `InMemoryTransactionStore` for unit tests, `TransactionRepository` for
+  the DB) with `save`/`get`/`list`. On save, the canonical document is SHREDDED into the class-table-
+  inheritance rows: `transaction` header (promoted po_number/line_count/lifecycle timestamps + state) +
+  per-doc-type subtype (`transaction_810` invoice, `transaction_855` ack, `transaction_856` shipment,
+  `transaction_850`) + `transaction_line` + `transaction_line_identifier` (qualified product ids) +
+  per-doc-type line subtypes (855 ack status) + `transaction_party`/`_reference`/`_date` — all in one DB
+  transaction, amounts as exact decimal text. `get` RECONSTRUCTS the canonical from the rows (for
+  re-emit — no primary blob). `InboundPipeline` persists every transaction (accepted → DELIVERED,
+  rejected → REJECTED with reason — a bad doc is stored too, queryable for review) and links
+  `processing_event.transactionId`. Wired via IntakeModule (`TransactionStore` → TransactionRepository).
+  Tests: end-to-end DB persistence + reconstruction on 850 through the live pipeline (poNumber/lines/qty/
+  price/ids), + direct repo round-trips for 810 (invoice subtype + total), 855 (line ack subtype),
+  850 (parties + references), + REJECTED-doc persistence + `list` by state. 185 tests green (stable ×3),
+  build clean. Fixed: unqualified line ids (value-only, no type) violated the identifier NOT NULL — now
+  skipped (captured by the promoted `sku` column). **Deferred to slice 4b:** interchange row +
+  acknowledgment/delivery/dispatch persistence; outbound-transaction persistence (+ G1 grouping). The
+  lifecycle plane is now substantially persisted; config read-cache still pairs with the provisioning API.
+
 ### 2026-08-02 — Phase 2: durable control numbers wired into the live pipeline [DB slice 3b]
 
 - **D74. ControlNumberService made async + tenant-scoped; durable ControlNumberRepository wired into

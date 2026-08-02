@@ -24,6 +24,7 @@ import { InboundGateway } from '../intake/inbound-gateway';
 import { InMemoryRawArtifactStore } from '../intake/raw-artifact.store';
 import { InMemoryDedupStore } from '../intake/dedup.store';
 import { InMemoryProcessingLedger, ProcessingLedger } from '../intake/processing-ledger';
+import { InMemoryTransactionStore } from '../intake/transaction-store';
 import { FunctionalAckService } from '../ack/functional-ack.service';
 
 describe('QuarantineResolver (operator actions on the review queue)', () => {
@@ -83,7 +84,7 @@ describe('QuarantineResolver (operator actions on the review queue)', () => {
     const raw = new InMemoryRawArtifactStore();
     ledger = new InMemoryProcessingLedger();
     const gateway = new InboundGateway(raw, new InMemoryDedupStore(), x12);
-    inbound = new InboundPipeline(gateway, x12, pipeline, orch, new FunctionalAckService(), envelope, controlNumbers, ledger);
+    inbound = new InboundPipeline(gateway, x12, pipeline, orch, new FunctionalAckService(), envelope, controlNumbers, ledger, new InMemoryTransactionStore());
     resolver = new QuarantineResolver(ledger, raw, inbound);
   });
 
