@@ -224,7 +224,7 @@ describe('InboundPipeline (partner X12 → intake → translate → deliver → 
       expect(e1.artifactId).toBe(e2.artifactId); // same retained interchange
       expect(e1.transactionControlNumber).toBe('0001');
       expect(e2.transactionControlNumber).toBe('0002');
-      expect(ledger.timeline(r.receipt!.dedupKey)).toHaveLength(2);
+      expect(await ledger.timeline('t1', r.receipt!.dedupKey)).toHaveLength(2);
     });
   });
 });

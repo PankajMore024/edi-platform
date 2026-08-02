@@ -1,15 +1,15 @@
 import { randomUUID } from 'crypto';
 import { Kysely, sql } from 'kysely';
 import { DB } from '../schema';
-import { DedupRecord } from '../../intake/dedup.store';
+import { DedupRecord, DedupStore } from '../../intake/dedup.store';
 
 /**
- * Durable idempotency ledger (the DB form of DedupStore). `register` is an atomic upsert keyed on
- * (tenant, dedup_key): first occurrence inserts with occurrences=1, subsequent ones increment — so
- * the same interchange can never be processed twice. Multi-tenant.
+ * Durable idempotency ledger — the DB implementation of DedupStore. `register` is an atomic upsert
+ * keyed on (tenant, dedup_key): first occurrence inserts with occurrences=1, subsequent ones
+ * increment — so the same interchange can never be processed twice.
  */
-export class DedupRepository {
-  constructor(private readonly db: Kysely<DB>) {}
+export class DedupRepository extends DedupStore {
+  constructor(private readonly db: Kysely<DB>) { super(); }
 
   async register(tenantId: string, key: string, artifactId: string, fingerprint: string, at: Date): Promise<DedupRecord> {
     await this.db.insertInto('dedup_ledger')

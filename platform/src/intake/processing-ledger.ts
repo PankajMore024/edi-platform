@@ -77,15 +77,15 @@ export interface ProcessingQuery {
  * swaps in behind this abstract class.
  */
 export abstract class ProcessingLedger {
-  abstract record(entry: ProcessingRecordInput): ProcessingRecord;
-  abstract get(id: string): ProcessingRecord | undefined;
-  abstract list(query?: ProcessingQuery): ProcessingRecord[];
+  abstract record(entry: ProcessingRecordInput): Promise<ProcessingRecord>;
+  abstract get(id: string): Promise<ProcessingRecord | undefined>;
+  abstract list(query?: ProcessingQuery): Promise<ProcessingRecord[]>;
   /** Every event for one interchange identity, oldest first — the full lifecycle of that document. */
-  abstract timeline(dedupKey: string): ProcessingRecord[];
+  abstract timeline(tenantId: string, dedupKey: string): Promise<ProcessingRecord[]>;
   /** The review queue: OPEN events awaiting human attention (conflicts, rejects — not yet resolved). */
-  abstract needingReview(tenantId?: string): ProcessingRecord[];
+  abstract needingReview(tenantId?: string): Promise<ProcessingRecord[]>;
   /** Stamp an operator resolution onto a review event. */
-  abstract resolve(id: string, patch: ResolutionPatch): ProcessingRecord;
+  abstract resolve(id: string, patch: ResolutionPatch): Promise<ProcessingRecord>;
 }
 
 @Injectable()
@@ -93,19 +93,19 @@ export class InMemoryProcessingLedger extends ProcessingLedger {
   private readonly records: ProcessingRecord[] = [];
   private seq = 0;
 
-  record(entry: ProcessingRecordInput): ProcessingRecord {
+  async record(entry: ProcessingRecordInput): Promise<ProcessingRecord> {
     this.seq += 1;
     const rec: ProcessingRecord = { ...entry, id: `evt-${this.seq}` };
     this.records.push(rec);
     return { ...rec };
   }
 
-  get(id: string): ProcessingRecord | undefined {
+  async get(id: string): Promise<ProcessingRecord | undefined> {
     const r = this.records.find((x) => x.id === id);
     return r ? { ...r } : undefined;
   }
 
-  list(query: ProcessingQuery = {}): ProcessingRecord[] {
+  async list(query: ProcessingQuery = {}): Promise<ProcessingRecord[]> {
     return this.records
       .filter((r) => (query.tenantId === undefined || r.tenantId === query.tenantId))
       .filter((r) => (query.relationshipId === undefined || r.relationshipId === query.relationshipId))
@@ -114,16 +114,16 @@ export class InMemoryProcessingLedger extends ProcessingLedger {
       .map((r) => ({ ...r }));
   }
 
-  timeline(dedupKey: string): ProcessingRecord[] {
-    return this.records.filter((r) => r.dedupKey === dedupKey).map((r) => ({ ...r }));
+  async timeline(tenantId: string, dedupKey: string): Promise<ProcessingRecord[]> {
+    return this.records.filter((r) => r.tenantId === tenantId && r.dedupKey === dedupKey).map((r) => ({ ...r }));
   }
 
-  needingReview(tenantId?: string): ProcessingRecord[] {
+  async needingReview(tenantId?: string): Promise<ProcessingRecord[]> {
     // Open items only: flagged for review AND not yet resolved.
-    return this.list({ tenantId, needsReview: true }).filter((r) => !r.resolvedAt);
+    return (await this.list({ tenantId, needsReview: true })).filter((r) => !r.resolvedAt);
   }
 
-  resolve(id: string, patch: ResolutionPatch): ProcessingRecord {
+  async resolve(id: string, patch: ResolutionPatch): Promise<ProcessingRecord> {
     const rec = this.records.find((x) => x.id === id);
     if (!rec) throw new Error(`processing event ${id} not found`);
     Object.assign(rec, patch);

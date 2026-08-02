@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Kysely } from 'kysely';
 import { DB, ProcessingEventTable } from '../schema';
-import { ProcessingRecord, ProcessingRecordInput, ProcessingQuery, ResolutionPatch } from '../../intake/processing-ledger';
+import { ProcessingLedger, ProcessingRecord, ProcessingRecordInput, ProcessingQuery, ResolutionPatch } from '../../intake/processing-ledger';
 
 const b = (v: boolean | undefined): number | null => (v === undefined ? null : v ? 1 : 0);
 const fromB = (v: number | null): boolean | undefined => (v == null ? undefined : v === 1);
@@ -12,9 +12,9 @@ const nz = <T>(v: T | null | undefined): T | undefined => (v == null ? undefined
  * document lifecycle event; conflicts/rejects surface via the review queue; resolutions are stamped in
  * place. Multi-tenant — reads are tenant-scoped. `record`/`resolve` mirror the in-memory contract.
  */
-export class ProcessingRepository {
+export class ProcessingRepository extends ProcessingLedger {
   private lastStamp = 0;
-  constructor(private readonly db: Kysely<DB>) {}
+  constructor(private readonly db: Kysely<DB>) { super(); }
 
   /**
    * A strictly-increasing system timestamp for stable audit ordering. Wall-clock is only millisecond-

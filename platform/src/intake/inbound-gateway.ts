@@ -22,15 +22,15 @@ export class InboundGateway {
     private readonly x12: X12Service,
   ) {}
 
-  receive(source: string, bytes: string, receivedAt: Date): IntakeReceipt {
+  async receive(tenantId: string, source: string, bytes: string, receivedAt: Date): Promise<IntakeReceipt> {
     // 1. Retain first — if identity derivation or anything downstream throws, the raw is safe.
-    const artifact = this.raw.put(source, bytes, receivedAt);
+    const artifact = await this.raw.put(tenantId, source, bytes, receivedAt);
 
     // 2. Derive the interchange identity (dedup key) + a normalized-content fingerprint.
     const { key, fingerprint } = this.identify(bytes, artifact.id);
 
     // 3. Atomic check-and-record on the identity.
-    const record = this.dedup.register(key, artifact.id, fingerprint, receivedAt);
+    const record = await this.dedup.register(tenantId, key, artifact.id, fingerprint, receivedAt);
 
     const status = record.occurrences === 1 ? 'accepted' : 'duplicate';
     // Same interchange identity but different NORMALIZED content = NOT a benign resend. Surface it.

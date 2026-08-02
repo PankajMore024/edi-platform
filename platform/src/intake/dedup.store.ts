@@ -20,38 +20,35 @@ export interface DedupRecord {
 
 /**
  * Idempotency ledger for inbound interchanges. `register` is a single atomic check-and-record: it
- * MUST return the state AFTER counting this occurrence, so the caller can decide accept-vs-duplicate
- * without a separate read (a check-then-set gap would allow the same interchange to be processed
- * twice under concurrency). A DB impl backs this with an upsert / unique constraint.
+ * returns the state AFTER counting this occurrence (a check-then-set gap would let the same
+ * interchange process twice). Async + multi-tenant so a DB upsert impl can back it.
  */
 export abstract class DedupStore {
-  abstract register(key: string, artifactId: string, fingerprint: string, at: Date): DedupRecord;
-  abstract lookup(key: string): DedupRecord | undefined;
+  abstract register(tenantId: string, key: string, artifactId: string, fingerprint: string, at: Date): Promise<DedupRecord>;
+  abstract lookup(tenantId: string, key: string): Promise<DedupRecord | undefined>;
 }
 
 @Injectable()
 export class InMemoryDedupStore extends DedupStore {
   private readonly records = new Map<string, DedupRecord>();
+  private key(tenantId: string, key: string): string { return `${tenantId} ${key}`; }
 
-  register(key: string, artifactId: string, fingerprint: string, at: Date): DedupRecord {
-    const existing = this.records.get(key);
+  async register(tenantId: string, key: string, artifactId: string, fingerprint: string, at: Date): Promise<DedupRecord> {
+    const k = this.key(tenantId, key);
+    const existing = this.records.get(k);
     if (existing) {
       existing.occurrences += 1;
       return { ...existing };
     }
     const record: DedupRecord = {
-      key,
-      firstArtifactId: artifactId,
-      firstFingerprint: fingerprint,
-      firstSeenAt: at.toISOString(),
-      occurrences: 1,
+      key, firstArtifactId: artifactId, firstFingerprint: fingerprint, firstSeenAt: at.toISOString(), occurrences: 1,
     };
-    this.records.set(key, record);
+    this.records.set(k, record);
     return { ...record };
   }
 
-  lookup(key: string): DedupRecord | undefined {
-    const r = this.records.get(key);
+  async lookup(tenantId: string, key: string): Promise<DedupRecord | undefined> {
+    const r = this.records.get(this.key(tenantId, key));
     return r ? { ...r } : undefined;
   }
 }

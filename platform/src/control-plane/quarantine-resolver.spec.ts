@@ -98,7 +98,7 @@ describe('QuarantineResolver (operator actions on the review queue)', () => {
   it('queue() lists open conflicts and rejects', async () => {
     await inbound.receive(rel, 'sftp:acme', await validEdi(), at); // accepted (not in queue)
     await inbound.receive(rel, 'sftp:acme', await invalidEdi(), at); // rejected → queue
-    expect(resolver.queue('t1').map((e) => e.outcome)).toEqual(['rejected']);
+    expect((await resolver.queue('t1')).map((e) => e.outcome)).toEqual(['rejected']);
   });
 
   it('dismiss() closes a conflict without processing, and drops it from the queue', async () => {
@@ -107,10 +107,10 @@ describe('QuarantineResolver (operator actions on the review queue)', () => {
     const conflict = await inbound.receive(rel, 'sftp:acme', edi.replace(/4500/g, '4599'), at);
     expect(conflict.outcome).toBe('conflict');
 
-    const { resolution, result } = resolver.dismiss(conflict.event!.id, 'ops@acme', 'partner double-sent under a reused ICN', later);
+    const { resolution, result } = await resolver.dismiss(conflict.event!.id, 'ops@acme', 'partner double-sent under a reused ICN', later);
     expect(result).toBeUndefined(); // nothing processed/delivered
     expect(resolution).toMatchObject({ resolution: 'dismissed', resolvedBy: 'ops@acme', resolvedAt: later.toISOString() });
-    expect(resolver.queue('t1')).toHaveLength(0);
+    expect(await resolver.queue('t1')).toHaveLength(0);
   });
 
   it('reprocess() a conflict whose content is valid → accepted, delivered, and linked', async () => {
@@ -125,7 +125,7 @@ describe('QuarantineResolver (operator actions on the review queue)', () => {
     expect(result!.receipt).toBeUndefined(); // reprocess is not a fresh intake
     // the review event is stamped and linked to the new processing event
     expect(resolution).toMatchObject({ resolution: 'reprocessed', resolutionEventId: result!.transactions[0].event.id });
-    expect(resolver.queue('t1')).toHaveLength(0);
+    expect(await resolver.queue('t1')).toHaveLength(0);
   });
 
   it('reprocess() a still-invalid doc → rejected again; original resolved, new reject re-queued', async () => {
@@ -137,19 +137,19 @@ describe('QuarantineResolver (operator actions on the review queue)', () => {
     expect(result!.outcome).toBe('rejected'); // same bytes, same spec → still fails
     expect(result!.transactions[0].event.note).toContain(`reprocess of ${original.id}`);
 
-    const queue = resolver.queue('t1');
+    const queue = await resolver.queue('t1');
     expect(queue.map((e) => e.id)).toEqual([result!.transactions[0].event.id]); // original gone, new reject present
   });
 
   it('guards: unknown / non-review / already-resolved events are refused', async () => {
-    expect(() => resolver.dismiss('nope', 'op', 'x', later)).toThrow(/not found/);
+    await expect(resolver.dismiss('nope', 'op', 'x', later)).rejects.toThrow(/not found/);
 
     const accepted = await inbound.receive(rel, 'sftp:acme', await validEdi(), at);
-    expect(() => resolver.dismiss(accepted.transactions[0].event.id, 'op', 'x', later)).toThrow(/not in the review queue/);
+    await expect(resolver.dismiss(accepted.transactions[0].event.id, 'op', 'x', later)).rejects.toThrow(/not in the review queue/);
 
     const rejected = await inbound.receive(rel, 'sftp:acme', await invalidEdi(), at);
     const rejectedId = rejected.transactions[0].event.id;
-    resolver.dismiss(rejectedId, 'op', 'first', later);
-    expect(() => resolver.dismiss(rejectedId, 'op', 'again', later)).toThrow(/already resolved/);
+    await resolver.dismiss(rejectedId, 'op', 'first', later);
+    await expect(resolver.dismiss(rejectedId, 'op', 'again', later)).rejects.toThrow(/already resolved/);
   });
 });

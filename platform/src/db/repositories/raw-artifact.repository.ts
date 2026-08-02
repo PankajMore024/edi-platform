@@ -2,14 +2,15 @@ import { createHash } from 'crypto';
 import { Kysely } from 'kysely';
 import { DB } from '../schema';
 import { RawArtifact } from '../../intake/intake.types';
+import { RawArtifactStore } from '../../intake/raw-artifact.store';
 
 /**
- * Durable, content-addressed raw-artifact retention (the DB form of RawArtifactStore). Identity is the
- * sha256 of the bytes, scoped per tenant; append-only, first-write-wins (a re-put of identical content
- * returns the original row). Multi-tenant: every call is scoped by `tenantId`.
+ * Durable, content-addressed raw-artifact retention — the DB implementation of RawArtifactStore.
+ * Identity is the sha256 of the bytes, scoped per tenant; append-only, first-write-wins (a re-put of
+ * identical content returns the original row).
  */
-export class RawArtifactRepository {
-  constructor(private readonly db: Kysely<DB>) {}
+export class RawArtifactRepository extends RawArtifactStore {
+  constructor(private readonly db: Kysely<DB>) { super(); }
 
   async put(tenantId: string, source: string, bytes: string, receivedAt: Date): Promise<RawArtifact> {
     const id = createHash('sha256').update(bytes, 'utf8').digest('hex');

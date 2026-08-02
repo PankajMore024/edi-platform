@@ -29,38 +29,38 @@ export class QuarantineResolver {
     private readonly pipeline: InboundPipeline,
   ) {}
 
-  queue(tenantId?: string): ProcessingRecord[] {
+  queue(tenantId?: string): Promise<ProcessingRecord[]> {
     return this.ledger.needingReview(tenantId);
   }
 
-  dismiss(eventId: string, resolvedBy: string, note: string, at: Date): ResolutionResult {
-    this.requireOpen(eventId);
-    const resolution = this.ledger.resolve(eventId, {
+  async dismiss(eventId: string, resolvedBy: string, note: string, at: Date): Promise<ResolutionResult> {
+    await this.requireOpen(eventId);
+    const resolution = await this.ledger.resolve(eventId, {
       resolution: 'dismissed', resolvedBy, resolutionNote: note, resolvedAt: at.toISOString(),
     });
     return { resolution };
   }
 
   async reprocess(rel: TradingRelationship, eventId: string, resolvedBy: string, note: string, at: Date): Promise<ResolutionResult> {
-    const event = this.requireOpen(eventId);
+    const event = await this.requireOpen(eventId);
     if (event.relationshipId !== rel.id) {
       throw new Error(`event ${eventId} belongs to relationship ${event.relationshipId}, not ${rel.id}`);
     }
-    const artifact = this.artifacts.get(event.artifactId);
+    const artifact = await this.artifacts.get(rel.tenantId, event.artifactId);
     if (!artifact) throw new Error(`cannot reprocess ${eventId}: raw artifact ${event.artifactId} not found`);
 
     const result = await this.pipeline.reprocess(rel, artifact, event, at);
     // Link the review event to the new processing event this reprocess produced (the matching set
     // for a per-TS reprocess; the first set for a whole-interchange conflict reprocess).
-    const resolution = this.ledger.resolve(eventId, {
+    const resolution = await this.ledger.resolve(eventId, {
       resolution: 'reprocessed', resolvedBy, resolutionNote: note, resolvedAt: at.toISOString(),
       resolutionEventId: result.transactions[0]?.event.id,
     });
     return { resolution, result };
   }
 
-  private requireOpen(eventId: string): ProcessingRecord {
-    const event = this.ledger.get(eventId);
+  private async requireOpen(eventId: string): Promise<ProcessingRecord> {
+    const event = await this.ledger.get(eventId);
     if (!event) throw new Error(`review event ${eventId} not found`);
     if (!event.needsReview) throw new Error(`event ${eventId} is not in the review queue`);
     if (event.resolvedAt) throw new Error(`event ${eventId} was already resolved (${event.resolution})`);

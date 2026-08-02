@@ -69,6 +69,27 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 2: DB repos wired into the live pipeline [DB slice 2]
+
+- **D72. Intake stores converged to async + multi-tenant; durable repos swapped into the pipeline.**
+  Made the intake store interfaces (`RawArtifactStore`, `DedupStore`, `ProcessingLedger`) **async +
+  tenant-scoped** (`put(tenantId,…)`, `register(tenantId,…)`, `timeline(tenantId,dedupKey)`, etc.) —
+  required for a real DB backend. In-memory impls updated (tenant-composite keys, async). The Kysely
+  repos now `extend` these abstract classes, so DI binds the abstract token to the durable repo:
+  `IntakeModule` uses `{ provide: RawArtifactStore, useExisting: RawArtifactRepository }` (repos from
+  the @Global DatabaseModule) → **the running app persists to Postgres/sqlite**. Threaded `tenantId`
+  through `InboundGateway.receive(tenantId,…)` (from `rel.tenantId`) and awaited the async ledger/gateway
+  in `InboundPipeline` + `QuarantineResolver` (dismiss/queue/requireOpen now async). Ripple was
+  mechanical; updated the gateway/ledger/pipeline/resolver specs (unit tests keep constructing in-memory
+  impls directly against the same async contract). Added a **DB integration test**
+  (`inbound-pipeline.db.spec.ts`) running the live pipeline on real sqlite repos — proves retention +
+  dedup + the lifecycle event persist to the DB (accept → event row + retrievable artifact; duplicate/
+  conflict → timeline + review queue). A per-tenant-isolation gateway test confirms two tenants with
+  identical bytes are independent. 176 tests green (stable ×3), build clean, app graph boots with the
+  DB-backed pipeline. **Remaining DB slices:** (3) config-plane repos + atomic durable control numbers
+  behind refactored config stores; (4) persist the `transaction` header+subtype+line rows + acks/
+  delivery/dispatch, reconstruct canonical from rows for emit. G1/G2/G4 still open.
+
 ### 2026-08-02 — Phase 2: persistence foundation (Kysely + Postgres/sqlite) [DB slice 1]
 
 - **D71. DB layer foundation + full schema + durable lifecycle repositories.** Chose **Kysely** (query

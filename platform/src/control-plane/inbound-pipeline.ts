@@ -95,14 +95,14 @@ export class InboundPipeline {
 
   async receive(rel: TradingRelationship, source: string, bytes: string, receivedAt: Date): Promise<InboundResult> {
     // 1. Retain immutably + dedup on interchange identity, before anything else touches the bytes.
-    const receipt = this.gateway.receive(source, bytes, receivedAt);
+    const receipt = await this.gateway.receive(rel.tenantId, source, bytes, receivedAt);
 
     // Duplicate / conflict short-circuit — but ALWAYS record the event so the lifecycle is auditable
     // and conflicts land in the review queue (the retained bytes of both versions are kept; the event
     // links this artifact to the original via firstArtifactId).
     if (receipt.status === 'duplicate') {
       const outcome: InboundOutcome = receipt.conflict ? 'conflict' : 'duplicate';
-      const event = this.logEvent(rel, this.baseOf(receipt), outcome, {
+      const event = await this.logEvent(rel, this.baseOf(receipt), outcome, {
         delivered: false,
         needsReview: receipt.conflict,
         note: receipt.conflict
@@ -176,7 +176,7 @@ export class InboundPipeline {
       // Record one lifecycle event per transaction set, carrying its identity + this group's ack ref.
       for (const p of processed) {
         const outcome: InboundOutcome = p.conformant ? 'accepted' : 'rejected';
-        const event = this.logEvent(rel, ctx, outcome, {
+        const event = await this.logEvent(rel, ctx, outcome, {
           docType: p.ts.transactionSetCode,
           functionalGroupControlNumber: group.groupControlNumber,
           transactionControlNumber: p.ts.controlNumber,
@@ -272,7 +272,7 @@ export class InboundPipeline {
     ctx: ProcessContext,
     outcome: InboundOutcome,
     detail: Partial<Omit<ProcessingRecord, 'id' | 'tenantId' | 'relationshipId' | 'outcome' | 'source' | 'receivedAt' | 'artifactId' | 'dedupKey' | 'occurrence' | 'firstArtifactId' | 'firstSeenAt'>> & { delivered: boolean; needsReview: boolean },
-  ): ProcessingRecord {
+  ): Promise<ProcessingRecord> {
     return this.ledger.record({
       tenantId: rel.tenantId,
       relationshipId: rel.id,

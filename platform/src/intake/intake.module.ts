@@ -1,22 +1,26 @@
 import { Module } from '@nestjs/common';
 import { X12Module } from '../x12/x12.module';
 import { InboundGateway } from './inbound-gateway';
-import { RawArtifactStore, InMemoryRawArtifactStore } from './raw-artifact.store';
-import { DedupStore, InMemoryDedupStore } from './dedup.store';
-import { ProcessingLedger, InMemoryProcessingLedger } from './processing-ledger';
+import { RawArtifactStore } from './raw-artifact.store';
+import { DedupStore } from './dedup.store';
+import { ProcessingLedger } from './processing-ledger';
+import { RawArtifactRepository } from '../db/repositories/raw-artifact.repository';
+import { DedupRepository } from '../db/repositories/dedup.repository';
+import { ProcessingRepository } from '../db/repositories/processing.repository';
 
 /**
- * Intake — the inbound trust boundary (immutable raw retention + idempotent dedup). Stores are bound
- * to in-memory M1 implementations behind their abstract classes; a disk/S3/DB impl swaps in here
- * without touching InboundGateway. This is a future microservice-extraction seam.
+ * Intake — the inbound trust boundary (immutable raw retention + idempotent dedup + lifecycle ledger).
+ * The abstract stores are bound to the DURABLE Kysely repositories (provided by the global
+ * DatabaseModule), so the running app persists to Postgres/sqlite. Unit tests still construct the
+ * in-memory implementations directly against the same async contracts.
  */
 @Module({
   imports: [X12Module],
   providers: [
     InboundGateway,
-    { provide: RawArtifactStore, useClass: InMemoryRawArtifactStore },
-    { provide: DedupStore, useClass: InMemoryDedupStore },
-    { provide: ProcessingLedger, useClass: InMemoryProcessingLedger },
+    { provide: RawArtifactStore, useExisting: RawArtifactRepository },
+    { provide: DedupStore, useExisting: DedupRepository },
+    { provide: ProcessingLedger, useExisting: ProcessingRepository },
   ],
   exports: [InboundGateway, RawArtifactStore, DedupStore, ProcessingLedger],
 })
