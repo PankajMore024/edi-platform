@@ -3,6 +3,7 @@ import { InboundGateway } from '../intake/inbound-gateway';
 import { IntakeReceipt, RawArtifact } from '../intake/intake.types';
 import { ProcessingLedger, ProcessingOutcome, ProcessingRecord } from '../intake/processing-ledger';
 import { TransactionStore } from '../intake/transaction-store';
+import { LifecycleSink } from '../intake/lifecycle-sink';
 import { CanonicalDocument } from '../canonical/types/document.types';
 import { X12Service, RawSegment } from '../x12/x12.service';
 import { EnvelopeService, ControlNumbers, ParsedGroup, ParsedTransactionSet } from '../envelope/envelope.service';
@@ -94,6 +95,7 @@ export class InboundPipeline {
     private readonly controlNumbers: ControlNumberService,
     private readonly ledger: ProcessingLedger,
     private readonly txnStore: TransactionStore,
+    private readonly sink: LifecycleSink,
   ) {}
 
   async receive(rel: TradingRelationship, source: string, bytes: string, receivedAt: Date): Promise<InboundResult> {
@@ -152,8 +154,17 @@ export class InboundPipeline {
     timestamp: Date,
     only?: { group: ParsedGroup; ts: ParsedTransactionSet },
   ): Promise<InboundResult> {
-    const parsed = this.envelope.parseGroups(this.x12.parse(ctx.bytes));
+    const segments = this.x12.parse(ctx.bytes);
+    const parsed = this.envelope.parseGroups(segments);
     const groups = only ? [{ ...only.group, transactionSets: [only.ts] }] : parsed.groups;
+
+    // Record the received interchange envelope; transactions/events/acks link to it.
+    const isa = segments.find((s) => s.tag === 'ISA');
+    const interchangeId = await this.sink.saveInterchange({
+      tenantId: rel.tenantId, relationshipId: rel.id, artifactId: ctx.artifactId, direction: 'inbound', dedupKey: ctx.dedupKey,
+      isa13: (isa?.elements[12] ?? '').trim(), senderId: (isa?.elements[5] ?? '').trim(), receiverId: (isa?.elements[7] ?? '').trim(),
+      status: 'processed', occurrence: ctx.occurrence, conflict: false, receivedAt: ctx.receivedAt,
+    });
 
     const transactions: TransactionOutcome[] = [];
     const acks: InboundAck[] = [];
@@ -175,6 +186,13 @@ export class InboundPipeline {
 
       const ack = await this.buildGroupAck(rel, group, processed, timestamp);
       acks.push(ack);
+      // Persist the 997 and queue it for outbound dispatch (transport send is the deferred live step).
+      const ackId = await this.sink.saveAck({
+        tenantId: rel.tenantId, relationshipId: rel.id, interchangeId, ackType: '997',
+        controlNumber: ack.control.isa13, groupControlNumber: group.groupControlNumber, edi: ack.edi,
+        ak9: ack.segments.find((s) => s.tag === 'AK9')?.elements.join('*'),
+      });
+      await this.sink.enqueueDispatch({ tenantId: rel.tenantId, ackId, status: 'pending' });
 
       // Record one lifecycle event per transaction set, carrying its identity + this group's ack ref.
       for (const p of processed) {
@@ -182,7 +200,7 @@ export class InboundPipeline {
         // Persist the transaction itself (canonical → normalized rows) — a bad doc is stored too, in
         // REJECTED state, so it's queryable for review/debugging; it just wasn't delivered.
         const transactionId = await this.txnStore.save({
-          tenantId: rel.tenantId, relationshipId: rel.id, direction: 'inbound',
+          tenantId: rel.tenantId, relationshipId: rel.id, interchangeId, direction: 'inbound',
           docType: p.ts.transactionSetCode, transactionControlNumber: p.ts.controlNumber,
           functionalGroupControlNumber: group.groupControlNumber, doc: p.doc,
           currentState: p.conformant ? 'DELIVERED' : 'REJECTED', conformant: p.conformant,
@@ -191,6 +209,18 @@ export class InboundPipeline {
           deliveredAt: p.delivered ? timestamp.toISOString() : undefined,
           acknowledgedAt: timestamp.toISOString(),
         });
+
+        // Record what reached the customer system (only when delivered).
+        if (p.delivered) {
+          const rd = rel.documents.find((d) => d.docType === p.ts.transactionSetCode && d.direction === 'inbound' && d.enabled);
+          const payload = typeof p.deliveredPayload === 'string'
+            ? p.deliveredPayload
+            : Buffer.isBuffer(p.deliveredPayload) ? p.deliveredPayload.toString('base64') : JSON.stringify(p.deliveredPayload ?? null);
+          await this.sink.recordDelivery({
+            tenantId: rel.tenantId, transactionId, connectorInstanceId: rd?.connectorInstanceId, format: 'native', payload,
+            status: 'delivered', deliveredAt: timestamp.toISOString(),
+          });
+        }
         const event = await this.logEvent(rel, ctx, outcome, {
           transactionId,
           docType: p.ts.transactionSetCode,

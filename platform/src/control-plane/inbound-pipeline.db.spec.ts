@@ -29,6 +29,8 @@ import { RawArtifactRepository } from '../db/repositories/raw-artifact.repositor
 import { DedupRepository } from '../db/repositories/dedup.repository';
 import { ProcessingRepository } from '../db/repositories/processing.repository';
 import { TransactionRepository } from '../db/repositories/transaction.repository';
+import { DbLifecycleSink } from '../db/repositories/lifecycle-sink.repository';
+import { sql } from 'kysely';
 
 /**
  * Slice-2 integration: the live InboundPipeline running against the DURABLE Kysely repositories
@@ -87,7 +89,7 @@ describe('InboundPipeline on durable repositories (node:sqlite)', () => {
     orch = new IntegrationOrchestrator(pipeline, connectors, instances);
     raw = new RawArtifactRepository(db); ledger = new ProcessingRepository(db); txns = new TransactionRepository(db);
     const gateway = new InboundGateway(raw, new DedupRepository(db), x12);
-    inbound = new InboundPipeline(gateway, x12, pipeline, orch, new FunctionalAckService(), envelope, controlNumbers, ledger, txns);
+    inbound = new InboundPipeline(gateway, x12, pipeline, orch, new FunctionalAckService(), envelope, controlNumbers, ledger, txns, new DbLifecycleSink(db));
   });
   afterEach(async () => { await db.destroy(); });
 
@@ -115,6 +117,15 @@ describe('InboundPipeline on durable repositories (node:sqlite)', () => {
     expect(canon.lineItems[0].ids[0].value).toBe('012345678905');
     // queryable for dashboards without touching a blob
     expect((await txns.list('t1', { state: 'DELIVERED' })).map((t) => t.poNumber)).toEqual(['4500']);
+
+    // the write-side lifecycle rows are all persisted: interchange, 997, delivery, and a queued dispatch
+    const count = async (t: string) => Number((await sql<{ n: number }>`select count(*) as n from ${sql.ref(t)}`.execute(db)).rows[0].n);
+    expect(await count('interchange')).toBe(1);
+    expect(await count('acknowledgment')).toBe(1);
+    expect(await count('delivery')).toBe(1);
+    expect(await count('dispatch_queue')).toBe(1); // 997 queued for outbound send
+    // the transaction links to its interchange
+    expect(stored!.canonical).toBeDefined();
   });
 
   it('dedup persists across receives; conflict is recorded needing review', async () => {

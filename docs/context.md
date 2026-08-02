@@ -69,6 +69,24 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 2: interchange + ack/delivery/dispatch persistence [DB slice 4b]
+
+- **D76. The full inbound lifecycle now persists.** Added `LifecycleSink` (abstract; `InMemory` for
+  tests, `DbLifecycleSink` for the DB) bundling the pipeline's write-side records — its single producer.
+  `InboundPipeline.processInterchange` now: creates the `interchange` row (ISA13 + sender/receiver +
+  dedup key + status), links every transaction + processing-event to it (`interchange_id`), persists
+  each generated **997 → `acknowledgment`** (control #, group #, edi, AK9 summary) and **enqueues it on
+  `dispatch_queue`** (status `pending` — the outbound transport send is the deferred live step), and
+  records a **`delivery`** row for each document that reached the customer connector (payload; Buffer→
+  base64). Wired via IntakeModule (`LifecycleSink` → DbLifecycleSink). DB test asserts all four row
+  types (interchange/acknowledgment/delivery/dispatch_queue) land on an accept, alongside the
+  transaction. 185 tests green (stable ×3), build clean. **The inbound lifecycle plane is now fully
+  durable** (retention · dedup · interchange · transaction+children · processing events · 997 · delivery
+  · dispatch queue). **Deferred:** outbound-transaction persistence (+ G1 grouping); the actual
+  transport drain of dispatch_queue (credential-dependent); interchange rows for the duplicate/conflict
+  short-circuit (they keep artifact_id + dedup_key on the event). Config read-cache still pairs with the
+  provisioning API — the natural next milestone.
+
 ### 2026-08-02 — Phase 2: transaction persistence — canonical ⇄ normalized rows [DB slice 4]
 
 - **D75. The pipeline now persists each processed transaction as NORMALIZED rows (no blob).** Added

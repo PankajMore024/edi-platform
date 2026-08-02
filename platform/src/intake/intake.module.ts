@@ -5,10 +5,12 @@ import { RawArtifactStore } from './raw-artifact.store';
 import { DedupStore } from './dedup.store';
 import { ProcessingLedger } from './processing-ledger';
 import { TransactionStore } from './transaction-store';
+import { LifecycleSink } from './lifecycle-sink';
 import { RawArtifactRepository } from '../db/repositories/raw-artifact.repository';
 import { DedupRepository } from '../db/repositories/dedup.repository';
 import { ProcessingRepository } from '../db/repositories/processing.repository';
 import { TransactionRepository } from '../db/repositories/transaction.repository';
+import { DbLifecycleSink } from '../db/repositories/lifecycle-sink.repository';
 
 /**
  * Intake — the inbound trust boundary (immutable raw retention + idempotent dedup + lifecycle ledger).
@@ -24,7 +26,8 @@ import { TransactionRepository } from '../db/repositories/transaction.repository
     { provide: DedupStore, useExisting: DedupRepository },
     { provide: ProcessingLedger, useExisting: ProcessingRepository },
     { provide: TransactionStore, useExisting: TransactionRepository },
+    { provide: LifecycleSink, useExisting: DbLifecycleSink },
   ],
-  exports: [InboundGateway, RawArtifactStore, DedupStore, ProcessingLedger, TransactionStore],
+  exports: [InboundGateway, RawArtifactStore, DedupStore, ProcessingLedger, TransactionStore, LifecycleSink],
 })
 export class IntakeModule {}
