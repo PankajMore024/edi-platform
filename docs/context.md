@@ -69,6 +69,26 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 3: provisioning API / console backend [API slice 1]
+
+- **D77. HTTP API over the control plane.** First slice of the console/provisioning backend (NestJS
+  controllers under `/api`, global ValidationPipe, `@Tenant()` param decorator reading `x-tenant-id` —
+  every endpoint tenant-scoped; JWT/API-key auth is a follow-up). Endpoints: `CatalogController` (GET
+  /catalog[/connectors|/transports] from the registries), `RelationshipsController` (GET list/:id, PUT
+  :id → persists via RelationshipRepository — the provisioning write path + first live consumer of the
+  config repos), `DocumentsController` (GET /documents list + /:id detail from the normalized
+  transaction rows, /timeline/:dedupKey from the ledger — the Operate read model), `ReviewController`
+  (GET /review queue, POST /:id/dismiss, POST /:id/reprocess → QuarantineResolver, loading the rel from
+  RelationshipRepository). `ApiModule` wired into AppModule; repos from @Global DatabaseModule. e2e
+  tests with supertest boot the full app on node:sqlite: catalog (7 connectors/2 transports),
+  relationship PUT→GET round-trip + tenant isolation + 404, documents served from persisted rows,
+  review queue + dismiss. 189 tests green (stable ×3), build clean. **Deferred:** connector-instance /
+  map / spec provisioning endpoints (connector-instance needs its repo), the **sample-import endpoint**
+  (profiler G2), auth, and the **config read-cache** — now that the API persists config to the DB, the
+  cache is the bridge so the translate hot path reads API-written config (pairs with a future
+  receive/trigger endpoint, since the pipeline isn't HTTP-triggered yet). Body validation is currently
+  loose (TradingRelationship shape); strict DTOs are a follow-up.
+
 ### 2026-08-02 — Phase 2: interchange + ack/delivery/dispatch persistence [DB slice 4b]
 
 - **D76. The full inbound lifecycle now persists.** Added `LifecycleSink` (abstract; `InMemory` for

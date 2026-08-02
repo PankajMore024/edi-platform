@@ -12,6 +12,7 @@ import { IntakeModule } from './intake/intake.module';
 import { AckModule } from './ack/ack.module';
 import { TransportModule } from './transport/transport.module';
 import { DatabaseModule } from './db/database.module';
+import { ApiModule } from './api/api.module';
 
 /**
  * Root module.
@@ -51,6 +52,9 @@ import { DatabaseModule } from './db/database.module';
 
     // Phase 2 — transport (how bytes move: SFTP/webhook — composed with connectors)
     TransportModule,
+
+    // Phase 3 — HTTP API (console / provisioning backend)
+    ApiModule,
   ],
 })
 export class AppModule {}
