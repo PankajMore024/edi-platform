@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EDI Platform — Database Schema</title>
+<style>
+  :root {
+    --ground:#f6f8fb; --surface:#fff; --surface-2:#f0f3f8;
+    --ink:#0f1722; --muted:#5a6675; --faint:#8b97a6;
+    --border:#e3e8f0; --border-strong:#d2dae6;
+    --accent:#0d9aa0; --accent-ink:#06777c; --accent-wash:#e2f4f4;
+    --blue:#2f6df0; --blue-wash:#e6eefc;
+    --violet:#7a5af0; --violet-wash:#efeafd;
+    --ok:#158a4a; --ok-wash:#e3f5ea; --warn:#b9740a; --warn-wash:#fbf0dd; --bad:#d23a54; --bad-wash:#fce4e8;
+    --shadow:0 1px 2px rgba(15,23,34,.04),0 4px 16px rgba(15,23,34,.06);
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --ground:#0b0f16; --surface:#121926; --surface-2:#0e1520;
+    --ink:#e7edf5; --muted:#97a3b3; --faint:#6b7787;
+    --border:#202a39; --border-strong:#2c3849;
+    --accent:#2dd4d4; --accent-ink:#7fe9e9; --accent-wash:#10312f;
+    --blue:#6fa0ff; --blue-wash:#152238; --violet:#a68cff; --violet-wash:#1e1830;
+    --ok:#3ad07f; --ok-wash:#10261a; --warn:#f2b44e; --warn-wash:#2c2110; --bad:#fb7185; --bad-wash:#2c1218;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }}
+  :root[data-theme="light"]{--ground:#f6f8fb;--surface:#fff;--surface-2:#f0f3f8;--ink:#0f1722;--muted:#5a6675;--faint:#8b97a6;--border:#e3e8f0;--border-strong:#d2dae6;--accent:#0d9aa0;--accent-ink:#06777c;--accent-wash:#e2f4f4;--blue:#2f6df0;--blue-wash:#e6eefc;--violet:#7a5af0;--violet-wash:#efeafd;--ok:#158a4a;--ok-wash:#e3f5ea;--warn:#b9740a;--warn-wash:#fbf0dd;--bad:#d23a54;--bad-wash:#fce4e8;--shadow:0 1px 2px rgba(15,23,34,.04),0 4px 16px rgba(15,23,34,.06);}
+  :root[data-theme="dark"]{--ground:#0b0f16;--surface:#121926;--surface-2:#0e1520;--ink:#e7edf5;--muted:#97a3b3;--faint:#6b7787;--border:#202a39;--border-strong:#2c3849;--accent:#2dd4d4;--accent-ink:#7fe9e9;--accent-wash:#10312f;--blue:#6fa0ff;--blue-wash:#152238;--violet:#a68cff;--violet-wash:#1e1830;--ok:#3ad07f;--ok-wash:#10261a;--warn:#f2b44e;--warn-wash:#2c2110;--bad:#fb7185;--bad-wash:#2c1218;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);}
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:var(--mono);}
+  h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em;text-wrap:balance;}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px 80px;}
+
+  header.top{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--surface) 78%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);}
+  .top .in{max-width:1120px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:12px;}
+  .mark{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(145deg,var(--accent),var(--accent-ink));color:#fff;font-size:15px;box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 40%,transparent);}
+  .top b{font-size:14px;} .top .sub{font-size:11.5px;color:var(--faint);}
+  .top .sp{flex:1;} .toggle{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:15px;cursor:pointer;}
+
+  .hero{padding:40px 0 10px;}
+  .hero h1{font-size:30px;letter-spacing:-.02em;}
+  .hero p{color:var(--muted);max-width:70ch;margin:12px 0 0;font-size:15px;}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:22px 0 0;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
+  .legend .li{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);}
+  .swatch{width:12px;height:12px;border-radius:3px;border:1px solid var(--border-strong);}
+  .rel{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border);}
+
+  section{margin-top:40px;}
+  .sec-h{display:flex;align-items:baseline;gap:12px;margin-bottom:6px;}
+  .sec-h h2{font-size:20px;}
+  .sec-h .n{font-family:var(--mono);font-size:12px;color:var(--accent-ink);font-weight:700;background:var(--accent-wash);padding:2px 8px;border-radius:6px;}
+  .sec-sub{color:var(--muted);margin:0 0 18px;max-width:74ch;}
+
+  /* entity card */
+  .ent{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--faint);border-radius:10px;box-shadow:var(--shadow);overflow:hidden;}
+  .ent-h{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--border);background:var(--surface-2);}
+  .ent-h .tn{font-family:var(--mono);font-weight:650;font-size:13px;}
+  .ent-h .rtag{margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);}
+  .cols{list-style:none;margin:0;padding:6px 0;}
+  .cols li{display:flex;align-items:center;gap:8px;padding:4px 13px;font-size:12.5px;}
+  .cols li .cn{font-family:var(--mono);color:var(--ink);}
+  .cols li .ct{margin-left:auto;font-size:10.5px;font-family:var(--mono);color:var(--faint);}
+  .kb{font-size:9px;font-weight:800;letter-spacing:.03em;padding:1px 5px;border-radius:4px;}
+  .kb.PK{background:var(--accent-wash);color:var(--accent-ink);} .kb.FK{background:var(--blue-wash);color:var(--blue);}
+  .role-super{border-left-color:var(--accent);} .role-sub{border-left-color:var(--blue);}
+  .role-child{border-left-color:var(--violet);} .role-line{border-left-color:var(--warn);}
+  .role-ack{border-left-color:var(--bad);} .role-config{border-left-color:var(--faint);} .role-plumb{border-left-color:var(--ok);}
+
+  /* CTI diagram */
+  .cti{display:flex;flex-direction:column;gap:0;}
+  .band{margin:0;padding:0;}
+  .band-lbl{display:inline-flex;align-items:center;gap:8px;margin:18px 0 10px;font-size:12px;font-weight:600;color:var(--muted);}
+  .band-lbl::before{content:"";width:22px;height:2px;background:var(--border-strong);border-radius:2px;}
+  .super-wrap{max-width:440px;}
+  .row{display:grid;gap:12px;}
+  .row.g4{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));}
+  .row.g3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));}
+  .connector{width:2px;height:20px;background:var(--border-strong);margin:0 0 0 26px;}
+  .nest{border-left:2px dashed var(--border-strong);margin-left:26px;padding-left:20px;margin-top:4px;}
+  .note{font-size:12.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-top:12px;}
+  .note b{color:var(--ink);}
+
+  /* generic grids */
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));}
+
+  /* segment map */
+  .map{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);}
+  .map th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface-2);}
+  .map td{padding:9px 14px;border-bottom:1px solid var(--border);font-size:13px;}
+  .map tr:last-child td{border-bottom:0;}
+  .map td.seg{font-family:var(--mono);font-weight:600;color:var(--accent-ink);white-space:nowrap;}
+  .map td .arrow{color:var(--faint);}
+  .map .t{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:var(--muted);white-space:nowrap;}
+
+  /* rules */
+  .rules{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));}
+  .rule{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:15px 16px;}
+  .rule h3{font-size:13.5px;margin-bottom:9px;display:flex;align-items:center;gap:8px;}
+  .rule h3 .ic{width:24px;height:24px;border-radius:7px;background:var(--accent-wash);color:var(--accent-ink);display:grid;place-items:center;font-size:13px;}
+  .rule ul{margin:0;padding-left:16px;color:var(--muted);font-size:12.5px;}
+  .rule li{margin:4px 0;} .rule code{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--ink);}
+
+  .recipe{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:6px 18px;counter-reset:step;}
+  .recipe .step{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid var(--border);}
+  .recipe .step:last-child{border-bottom:0;}
+  .recipe .step::before{counter-increment:step;content:counter(step);flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;}
+  .recipe .step div{font-size:13px;} .recipe .step .t{color:var(--muted);margin-top:2px;font-size:12.5px;}
+  .recipe code{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;}
+
+  @media (max-width:720px){.hero h1{font-size:24px;}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+
+<header class="top"><div class="in">
+  <div class="mark">🗄️</div>
+  <div><b>EDI Platform · Database Schema</b><div class="sub">Class-Table Inheritance · multi-tenant · Postgres / sqlite</div></div>
+  <div class="sp"></div>
+  <button class="toggle" id="theme" title="Toggle theme">◐</button>
+</div></header>
+
+<div class="wrap">
+  <div class="hero">
+    <h1>Database schema &amp; modeling</h1>
+    <p>How documents, config, and the transaction lifecycle are stored. The document model uses
+    <b>class-table inheritance</b>: a shared supertype for what every doc type has, per-doc-type subtypes for
+    what only they have, and generic child tables for the structures that recur across all doc types — no
+    sparse columns, no per-tenant tables, one place for cross-type dashboards.</p>
+    <div class="legend" id="legend"></div>
+  </div>
+  <div id="root"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const T = (n,t,k)=>({n,t,k});
+  const card = (name, role, tag, cols) => `
+    <div class="ent role-${role}">
+      <div class="ent-h"><span class="tn">${name}</span>${tag?`<span class="rtag">${tag}</span>`:""}</div>
+      <ul class="cols">${cols.map(c=>`<li><span class="cn">${c.n}</span>${c.k?`<span class="kb ${c.k}">${c.k}</span>`:""}<span class="ct">${c.t||""}</span></li>`).join("")}</ul>
+    </div>`;
+
+  const legend = [
+    ["var(--accent)","Supertype"],["var(--blue)","Header subtype (1:1)"],["var(--violet)","Generic child (1:N)"],
+    ["var(--warn)","Line subtype (1:1)"],["var(--bad)","Acknowledgment"],["var(--faint)","Config"],["var(--ok)","Lifecycle plumbing"]
+  ];
+  document.getElementById("legend").innerHTML =
+    legend.map(l=>`<span class="li"><span class="swatch" style="background:${l[0]}"></span>${l[1]}</span>`).join("")
+    + `<span class="li"><span class="rel">1:1</span> one-to-one</span><span class="li"><span class="rel">1:N</span> one-to-many</span>`;
+
+  // ── document model ──
+  const supertype = card("transaction", "super", "supertype", [
+    T("id","text","PK"), T("tenant_id","text"), T("relationship_id","text","FK"), T("interchange_id","text","FK"),
+    T("doc_type","text"), T("direction","text"), T("po_number","text"),
+    T("transaction_control_number","st02"), T("functional_group_control_number","gs06"),
+    T("current_state","enum"), T("conformant","bool"), T("reason","text"), T("line_count","int"),
+    T("received_at / validated_at","ts"), T("delivered_at / acknowledged_at","ts"),
+  ]);
+  const headerSubs = [
+    card("transaction_850","sub","850 · PO",[T("transaction_id","PK/FK","PK"),T("purpose_code","text"),T("po_type","text"),T("po_date","date"),T("requested_ship_date","date")]),
+    card("transaction_810","sub","810 · Invoice",[T("transaction_id","PK/FK","PK"),T("invoice_number","text"),T("invoice_date","date"),T("total_amount","dec"),T("tax_amount","dec"),T("terms","text")]),
+    card("transaction_855","sub","855 · PO Ack",[T("transaction_id","PK/FK","PK"),T("purpose_code","text"),T("ack_type","text"),T("ack_date","date")]),
+    card("transaction_856","sub","856 · ASN",[T("transaction_id","PK/FK","PK"),T("shipment_id","text"),T("purpose","text"),T("ship_date","date"),T("carrier_scac","text"),T("tracking_number","text"),T("gross_weight","dec"),T("package_count","int")]),
+  ];
+  const line = card("transaction_line","child","1:N",[
+    T("id","text","PK"),T("transaction_id","text","FK"),T("line_number","int"),
+    T("sku","text"),T("sku_qualifier","text"),T("quantity","dec"),T("uom","text"),T("unit_price","dec"),T("amount","dec"),T("description","text"),
+  ]);
+  const lineKids = [
+    card("transaction_line_identifier","child","1:N · product ids",[T("id","text","PK"),T("line_id","text","FK"),T("qualifier","text"),T("value","text")]),
+    card("transaction_line_855","line","1:1 · item ack",[T("line_id","PK/FK","PK"),T("ack_status","text"),T("ack_quantity","dec"),T("reason","text")]),
+    card("transaction_line_856","line","1:1 · shipped",[T("line_id","PK/FK","PK"),T("shipped_quantity","dec"),T("ordered_quantity","dec"),T("uom","text"),T("carton_id","text")]),
+  ];
+  const loops = [
+    card("transaction_party","child","N1 loop",[T("id","text","PK"),T("transaction_id","text","FK"),T("role","text"),T("name","text"),T("id_code","text"),T("id_qualifier","text"),T("address1","text"),T("city / region / postal","text"),T("country","text")]),
+    card("transaction_reference","child","REF",[T("id","text","PK"),T("transaction_id","text","FK"),T("qualifier","text"),T("value","text")]),
+    card("transaction_date","child","DTM",[T("id","text","PK"),T("transaction_id","text","FK"),T("qualifier","text"),T("value","text")]),
+  ];
+  const ack = [
+    card("acknowledgment","ack","997 / TA1",[T("id","text","PK"),T("interchange_id","text","FK"),T("control_number","text"),T("group_control_number","text"),T("ak9","text"),T("edi","text"),T("dispatched","bool")]),
+    card("conformance_issue","ack","AK3/AK4",[T("id","text","PK"),T("transaction_id","text","FK"),T("level","enum"),T("segment_tag","text"),T("segment_position","int"),T("element_position","int"),T("error_code","text"),T("bad_value","text")]),
+  ];
+
+  const docModel = `
+    <section>
+      <div class="sec-h"><span class="n">§4</span><h2>Document model — Class-Table Inheritance</h2></div>
+      <p class="sec-sub">One shared spine, typed per-doc-type detail, generic recurring structures. A batched interchange fans out into many <span class="mono">transaction</span> rows; each owns its subtype + children (all <span class="mono">ON DELETE CASCADE</span>).</p>
+      <div class="cti">
+        <div class="super-wrap">${supertype}</div>
+        <div class="connector"></div>
+        <div class="band-lbl"><span class="rel">1:1</span> per-doc-type header subtypes — only that type's fields</div>
+        <div class="row g4">${headerSubs.join("")}</div>
+        <div class="band-lbl"><span class="rel">1:N</span> line items (generic across all doc types)</div>
+        <div class="super-wrap">${line}</div>
+        <div class="nest">
+          <div class="band-lbl" style="margin-top:8px">hang off each line row</div>
+          <div class="row g3">${lineKids.join("")}</div>
+        </div>
+        <div class="band-lbl"><span class="rel">1:N</span> shared EDI loops (same shape on every doc type)</div>
+        <div class="row g3">${loops.join("")}</div>
+        <div class="band-lbl">997 / Functional Ack — <b style="color:var(--ink);font-weight:600">not a business transaction</b>, it's the reply record</div>
+        <div class="row g3">${ack.join("")}</div>
+        <div class="note"><b>Why not one table per doc type?</b> That repeats the common columns + lifecycle in every table and forces UNION across N tables for any cross-type view. <b>Why not one wide table?</b> Doc-specific columns go sparse/empty. CTI avoids both: the supertype holds what's shared, subtypes hold what's specific, generics hold what recurs.</div>
+      </div>
+    </section>`;
+
+  // ── config plane ──
+  const config = [
+    card("tenant","config","",[T("id","PK","PK"),T("name","text")]),
+    card("trading_partner","config","",[T("id","PK","PK"),T("tenant_id","FK"),T("name","text"),T("isa_qualifier","text"),T("isa_id","text")]),
+    card("trading_relationship","config","",[T("id","PK","PK"),T("tenant_id","FK"),T("partner_id","FK"),T("mode","enum"),T("format_authority","enum"),T("tenant_role","enum"),T("version","text"),T("envelope","json"),T("active","bool"),T("version_no","int")]),
+    card("relationship_document","config","",[T("id","PK","PK"),T("relationship_id","FK"),T("doc_type","text"),T("direction","text"),T("spec_id","FK"),T("partner_map_id","FK"),T("connector_instance_id","FK"),T("enabled","bool")]),
+    card("connector_instance","config","client-level",[T("id","PK","PK"),T("tenant_id","FK"),T("connector_type","text"),T("name","text"),T("settings","json"),T("vault_ref","text"),T("trigger","text")]),
+    card("connector_map","config","reused ×partners",[T("id","PK","PK"),T("tenant_id","FK"),T("connector_instance_id","FK"),T("doc_type","text"),T("direction","text"),T("definition","json"),T("version_no","int")]),
+    card("partner_map","config","",[T("id","PK","PK"),T("tenant_id","FK"),T("doc_type","text"),T("direction","text"),T("definition","json"),T("version_no","int")]),
+    card("doc_spec","config","IG",[T("id","PK","PK"),T("tenant_id","FK"),T("doc_type","text"),T("version","text"),T("owner","enum"),T("definition","json")]),
+    card("transport_instance","config","",[T("id","PK","PK"),T("tenant_id","FK"),T("transport_type","text"),T("settings","json"),T("vault_ref","text"),T("direction","text")]),
+    card("control_number_seq","config","atomic",[T("id","PK","PK"),T("tenant_id","FK"),T("scope","text"),T("current_value","int")]),
+    card("config_audit","config","who/when",[T("id","PK","PK"),T("tenant_id","FK"),T("entity_type","text"),T("entity_id","text"),T("action","text"),T("actor","text"),T("before / after","json"),T("at","ts")]),
+  ];
+  const configSec = `
+    <section>
+      <div class="sec-h"><span class="n">§6a</span><h2>Config plane — master data</h2></div>
+      <p class="sec-sub">The durable “master config of a client with its partner”: slow-changing, versioned (<span class="mono">version_no</span>), audited (<span class="mono">config_audit</span>). The runtime reads only from here.</p>
+      <div class="grid">${config.join("")}</div>
+    </section>`;
+
+  // ── lifecycle plumbing ──
+  const plumb = [
+    card("raw_artifact","plumb","immutable",[T("id · sha256","PK","PK"),T("tenant_id","PK","PK"),T("source","text"),T("bytes","text"),T("size","int"),T("received_at","ts")]),
+    card("dedup_ledger","plumb","idempotency",[T("id","PK","PK"),T("tenant_id","FK"),T("dedup_key","uniq"),T("first_artifact_id","text"),T("first_fingerprint","text"),T("occurrences","int")]),
+    card("interchange","plumb","ISA/GS",[T("id","PK","PK"),T("tenant_id","FK"),T("artifact_id","FK"),T("dedup_key","text"),T("isa13","text"),T("sender_id / receiver_id","text"),T("status","enum"),T("occurrence","int"),T("conflict","bool")]),
+    card("processing_event","plumb","lifecycle log",[T("id","PK","PK"),T("tenant_id","FK"),T("transaction_id","FK"),T("outcome","enum"),T("delivered","bool"),T("needs_review","bool"),T("ack_control_number","text"),T("resolution / resolved_by","text")]),
+    card("transaction_event","plumb","state trail",[T("id","PK","PK"),T("transaction_id","FK"),T("state","enum"),T("detail","json"),T("at","ts")]),
+    card("delivery","plumb","emitted",[T("id","PK","PK"),T("transaction_id","FK"),T("connector_instance_id","FK"),T("format","text"),T("payload","text"),T("delivered_at","ts"),T("status","enum")]),
+    card("dispatch_queue","plumb","outbound send",[T("id","PK","PK"),T("ack_id","FK"),T("transaction_id","FK"),T("transport_instance_id","FK"),T("status","enum"),T("attempts","int"),T("next_attempt_at","ts")]),
+  ];
+  const plumbSec = `
+    <section>
+      <div class="sec-h"><span class="n">§6b</span><h2>Lifecycle plumbing</h2></div>
+      <p class="sec-sub">The per-document transactional record: immutable retention, idempotent dedup, append-only event logs, delivery + outbound dispatch. Status is a column update + an event row — never a mutated blob.</p>
+      <div class="grid">${plumb.join("")}</div>
+    </section>`;
+
+  // ── segment map ──
+  const seg = [
+    ["ISA / GS / ST","interchange (+ control #s on transaction)"],
+    ["BEG (850)","transaction.po_number + transaction_850"],
+    ["BIG / TDS / ITD (810)","transaction_810"],
+    ["BAK / ACK (855)","transaction_855 + transaction_line_855"],
+    ["BSN / TD1 / TD5 (856)","transaction_856 · SN1/MAN → transaction_line_856"],
+    ["PO1 / IT1 / LIN","transaction_line + transaction_line_identifier"],
+    ["N1 / N3 / N4","transaction_party (role = entity code)"],
+    ["REF","transaction_reference (qualifier → value)"],
+    ["DTM","transaction_date (qualifier → value)"],
+    ["AK1–AK9 (997)","acknowledgment + conformance_issue"],
+  ];
+  const segSec = `
+    <section>
+      <div class="sec-h"><span class="n">§4b</span><h2>X12 segment → table</h2></div>
+      <p class="sec-sub">Where each segment lands. Qualifier/value structures (REF, DTM, product ids, parties) are generic tables keyed by a qualifier — never a column per qualifier.</p>
+      <table class="map"><thead><tr><th>X12 segment</th><th></th><th>Table(s)</th></tr></thead><tbody>
+      ${seg.map(s=>`<tr><td class="seg">${s[0]}</td><td class="arrow">→</td><td>${s[1].split(/(\btransaction[\w]*|interchange|acknowledgment|conformance_issue)/).map(p=>/^(transaction[\w]*|interchange|acknowledgment|conformance_issue)$/.test(p)?`<span class="t">${p}</span>`:p).join("")}</td></tr>`).join("")}
+      </tbody></table>
+    </section>`;
+
+  // ── rules ──
+  const rules = [
+    ["🏷️","Naming",["Tables <code>snake_case</code>, singular, no app prefix.","Subtypes: <code>transaction_&lt;doc&gt;</code>, lines: <code>transaction_line_&lt;doc&gt;</code>.","PK is <code>id</code>; a 1:1 subtype's PK <b>is</b> the FK (<code>transaction_id</code>).","FKs: <code>&lt;table&gt;_id</code>. Timestamps: <code>_at</code>. Booleans read as predicates.","<code>transaction</code> is a SQL keyword — always quoted (Kysely does)."]],
+    ["🔢","Types (portable)",["Money &amp; quantities = <b>TEXT decimal</b>, never float.","Booleans = <code>integer</code> 0/1 (mapped in repos).","Timestamps/dates = ISO-8601 <code>text</code>.","Enums/codes = <code>text</code> (no DB enum → no migration to add a value).","pg-native jsonb/timestamptz/RLS/partitioning = prod refinement."]],
+    ["🔑","Keys, indexes, tenancy",["Every table has <code>tenant_id</code>; reads scoped by it.","Indexes lead with <code>tenant_id</code>; named <code>&lt;table&gt;_&lt;purpose&gt;</code>.","FKs declared with <code>ON DELETE CASCADE</code> for owned children.","Unique constraints encode invariants (dedup key, control-number scope)."]],
+    ["🧩","JSON policy",["JSON only for rare, non-query-path payloads (audit snapshots, event detail).","Business fields are <b>always</b> columns or child tables — never read from a blob.","Reaching for JSON to hold a business field → model it as a column instead."]],
+  ];
+  const rulesSec = `
+    <section>
+      <div class="sec-h"><span class="n">§1–5</span><h2>Conventions</h2></div>
+      <div class="rules">${rules.map(r=>`<div class="rule"><h3><span class="ic">${r[0]}</span>${r[1]}</h3><ul>${r[2].map(x=>`<li>${x}</li>`).join("")}</ul></div>`).join("")}</div>
+    </section>`;
+
+  // ── recipe ──
+  const steps = [
+    ["Add the header subtype","Create <code>transaction_&lt;doc&gt;</code> (1:1 by <code>transaction_id</code>) with only that type's header fields. Never add a field to <code>transaction</code> unless it's common to <b>all</b> doc types."],
+    ["Reuse the generic children","Lines, parties, references, dates, product ids already exist — map the doc's segments onto them. Don't duplicate."],
+    ["Add a line subtype only if needed","If the doc has line-level fields (like 856 shipped qty), add <code>transaction_line_&lt;doc&gt;</code> (1:1 with a line row). Otherwise skip."],
+    ["Promote hot values consciously","Duplicate a frequently-queried value to a typed column only deliberately — document it as a promoted convenience."],
+  ];
+  const recipeSec = `
+    <section>
+      <div class="sec-h"><span class="n">§4c</span><h2>Adding a new doc type</h2></div>
+      <p class="sec-sub">The whole point of CTI: a new doc type is a couple of small tables, not a schema upheaval — and never per-tenant.</p>
+      <div class="recipe">${steps.map(s=>`<div class="step"><div><div><b>${s[0]}</b></div><div class="t">${s[1]}</div></div></div>`).join("")}</div>
+    </section>`;
+
+  document.getElementById("root").innerHTML = docModel + segSec + configSec + plumbSec + rulesSec + recipeSec;
+
+  document.getElementById("theme").addEventListener("click",function(){
+    const cur=document.documentElement.getAttribute("data-theme");
+    const next=cur==="dark"?"light":cur==="light"?"dark":(window.matchMedia("(prefers-color-scheme: dark)").matches?"light":"dark");
+    document.documentElement.setAttribute("data-theme",next);
+  });
+})();
+</script>
+</body>
+</html>

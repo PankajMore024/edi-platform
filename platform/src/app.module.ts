@@ -11,6 +11,7 @@ import { ConnectorsModule } from './connectors/connectors.module';
 import { IntakeModule } from './intake/intake.module';
 import { AckModule } from './ack/ack.module';
 import { TransportModule } from './transport/transport.module';
+import { DatabaseModule } from './db/database.module';
 
 /**
  * Root module.
@@ -25,6 +26,9 @@ import { TransportModule } from './transport/transport.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+
+    // Persistence — durable master config + document lifecycle (Postgres in prod, node:sqlite otherwise)
+    DatabaseModule,
 
     // Phase 1 — deterministic bidirectional core
     CanonicalModule,

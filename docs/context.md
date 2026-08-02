@@ -69,6 +69,80 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 2: persistence foundation (Kysely + Postgres/sqlite) [DB slice 1]
+
+- **D71. DB layer foundation + full schema + durable lifecycle repositories.** Chose **Kysely** (query
+  builder, explicit, no decorator magic — fits the codebase) over Prisma/TypeORM; **Postgres** in prod
+  (via `DATABASE_URL`), **node:sqlite** for tests (Node 26 built-in — zero native build, runs in CI).
+  Wrote a minimal Kysely dialect over `node:sqlite` (`db/node-sqlite.dialect.ts`) + ambient types
+  (`@types/node@20` predates node:sqlite). **Full schema designed + committed** (`db/schema.ts` typed
+  rows, `db/migrations.ts` idempotent `createSchema`) across BOTH planes: CONFIG (tenant, trading_
+  partner, trading_relationship, relationship_document, connector_instance, connector_map, partner_map,
+  doc_spec, transport_instance, control_number_seq, config_audit) and LIFECYCLE (raw_artifact,
+  dedup_ledger, interchange, transaction, transaction_line, transaction_party, transaction_reference,
+  transaction_date, transaction_event, processing_event, conformance_issue, acknowledgment, delivery,
+  dispatch_queue) — 31 tables incl. the doc-type subtypes below. Portable types (text/integer; bool
+  0/1, ts as text) so identical DDL runs on pg + sqlite.
+  **Transaction content uses CLASS-TABLE INHERITANCE, not a JSON blob and not per-doc-type mega-tables**
+  (revised twice from user feedback — first "no blob" [blob can't be indexed for dashboards/ops, status
+  changes rewrite it], then "no sparse all-doc-types-in-one-table"). Analyzed the user's legacy schema
+  (`models/kon_*lists`: per-doc-type tables = repeated common cols + promoted keys + X12 segments as
+  JSON columns). Final model: **`transaction` = shared SUPERTYPE** (only fields common to every doc
+  type: control numbers, po_number, status/reason, line_count, lifecycle timestamps + current_state);
+  **`transaction_<doc>` = per-doc-type header SUBTYPE** 1:1 by transaction_id (only that type's fields —
+  `transaction_810` invoice_number/date/total/tax/terms, `transaction_856` shipment/carrier/tracking/
+  weight, `transaction_855` ack, `transaction_850` beg fields); **generic recurring children**
+  (`transaction_line`, `transaction_party` [N1], `transaction_reference` [REF], `transaction_date`
+  [DTM]) shared across doc types; **per-doc-type LINE subtypes** (`transaction_line_856` ship/pack,
+  `transaction_line_855` item-ack) 1:1 with a line row where a type adds line-level fields. No sparse
+  columns, no duplicated common columns, unified cross-type dashboards (query the supertype), still
+  multi-tenant (tenant_id, not per-tenant tables). 997/FA → `acknowledgment` + `conformance_issue`
+  (not a business transaction). FK constraints + ON DELETE CASCADE throughout; amounts/quantities as
+  TEXT decimal (no float money); no JSON blob on the query path. Lifecycle = column updates +
+  append-only event rows. 31 tables total. `DatabaseModule` (@Global) provides the Kysely conn + repos, bootstraps schema on init; wired
+  into AppModule (boots on sqlite in the app-graph test). Implemented 3 durable, multi-tenant,
+  async repositories mirroring the in-memory intake contracts: `RawArtifactRepository` (content-
+  addressed, first-write-wins via ON CONFLICT DO NOTHING), `DedupRepository` (atomic upsert increment),
+  `ProcessingRepository` (record/get/list/timeline/needingReview/resolve). Jest: whitelisted kysely
+  (ESM-only) for ts-jest transform (allowJs). **A repeat-run flake caught a real ordering bug** —
+  processing events ordered by ms-precision `created_at` tied and reshuffled the audit timeline (id
+  tiebreak is a random uuid); fixed with a per-instance strictly-increasing stamp. 173 tests green
+  (stable ×4), build clean. Added `transactionId?`/`interchangeId?` to ProcessingRecord (forward link).
+  **This is SLICE 1 (foundation, standalone repos not yet wired into the live pipeline).** Next slices:
+  (2) converge intake to async + swap DB repos into InboundGateway/pipeline; (3) config-plane repos +
+  atomic control numbers behind refactored stores; (4) transaction repository — persist header +
+  line/party/reference/date rows + acks/delivery/dispatch, reconstruct canonical from the normalized
+  rows for emit (no primary blob). Addresses backlog G3 (config) partly + the lifecycle-storage ask;
+  G1/G2 still open.
+
+### Tracked gaps / backlog (not yet built)
+
+- **G1. Multi-document grouping on the connector edge.** `ObjectMapper.ingest` treats a whole native
+  payload as ONE canonical document (header from row 1 / the object; every row → one line array). A
+  real client export (e.g. a NetSuite CSV of a day's POs) contains MANY documents in one file,
+  distinguished by a **document key** column (e.g. `PO_Number`). Needed: (a) the sample-import
+  profiler surfaces/detects the grouping key, (b) the engine splits a multi-doc payload into N
+  canonical documents grouped by that key (mirrors the multi-TS split we did on the partner edge in
+  D70). Until then, multi-order files collapse into one giant doc. Contained, credential-free; do
+  before real connector-edge go-live. Surfaced while designing the sample-import → mapping flow (admin
+  console).
+- **G2. Sample-import schema profiler.** The console needs a deterministic profiler that takes a
+  client sample (CSV/xlsx via existing parsers, or JSON/DB rowset), infers fields + types + header-vs-
+  line structure + the doc key (G1), and auto-suggests bindings to canonical (name/synonym/type match;
+  AI improves suggestions later). Output = a `ConnectorMap` saved to the library keyed by
+  `(connector, docType)`. Prototyped in the console artifact; backend not yet built.
+- **G3. Durable, versioned master-config persistence.** The control-plane config objects
+  (TradingRelationship, ConnectorInstance + ConnectorMap, DocSpec, TransportInstance) ARE the master
+  config a client↔partner setup — the runtime reads only from them — but today they live in in-memory
+  stores (`RelationshipStore`, `ConnectorInstanceStore`, `MapRegistry`, `SpecRegistry`, transport
+  registry), so a restart loses everything. Needed: swap a durable DB impl behind the existing store
+  interfaces (same seam pattern as the intake stores), plus (a) tenant-scoped isolation, (b) versioning
+  + audit trail on every config change (who/when — config changes move money), (c) environment split
+  (sandbox vs production copies with promotion). The connector map is client-level master config
+  (reused across partners); the relationship + bindings are the per-client↔partner master config. The
+  imported SAMPLE is input, not config — the generated ConnectorMap is what's stored. Surfaced while
+  building the sample-import/provisioning flow.
+
 ### 2026-08-02 — Phase 2: multi-group / multi-TS interchanges (batched, end-to-end)
 
 - **D70. Batched interchanges handled per transaction set, with one 997 per group.** The old

@@ -15,6 +15,9 @@ export interface ProcessingRecord {
   id: string;
   tenantId: string;
   relationshipId: string;
+  /** Links to the durable lifecycle rows (set by the DB-backed pipeline; absent in the in-memory M1). */
+  transactionId?: string;
+  interchangeId?: string;
   outcome: ProcessingOutcome;
   source: string;
   receivedAt: string;
