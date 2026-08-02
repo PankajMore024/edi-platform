@@ -6,6 +6,9 @@ import { createSchema } from './migrations';
 import { RawArtifactRepository } from './repositories/raw-artifact.repository';
 import { DedupRepository } from './repositories/dedup.repository';
 import { ProcessingRepository } from './repositories/processing.repository';
+import { ControlNumberRepository } from './repositories/control-number.repository';
+import { RelationshipRepository } from './repositories/relationship.repository';
+import { DocSpecRepository, PartnerMapRepository, ConnectorMapRepository, TransportInstanceRepository } from './repositories/config-repositories';
 
 /**
  * Provides the shared Kysely connection + durable repositories, and bootstraps the schema on startup.
@@ -18,8 +21,18 @@ import { ProcessingRepository } from './repositories/processing.repository';
     { provide: RawArtifactRepository, useFactory: (db: Kysely<DB>) => new RawArtifactRepository(db), inject: [DATABASE] },
     { provide: DedupRepository, useFactory: (db: Kysely<DB>) => new DedupRepository(db), inject: [DATABASE] },
     { provide: ProcessingRepository, useFactory: (db: Kysely<DB>) => new ProcessingRepository(db), inject: [DATABASE] },
+    { provide: ControlNumberRepository, useFactory: (db: Kysely<DB>) => new ControlNumberRepository(db), inject: [DATABASE] },
+    { provide: RelationshipRepository, useFactory: (db: Kysely<DB>) => new RelationshipRepository(db), inject: [DATABASE] },
+    { provide: DocSpecRepository, useFactory: (db: Kysely<DB>) => new DocSpecRepository(db), inject: [DATABASE] },
+    { provide: PartnerMapRepository, useFactory: (db: Kysely<DB>) => new PartnerMapRepository(db), inject: [DATABASE] },
+    { provide: ConnectorMapRepository, useFactory: (db: Kysely<DB>) => new ConnectorMapRepository(db), inject: [DATABASE] },
+    { provide: TransportInstanceRepository, useFactory: (db: Kysely<DB>) => new TransportInstanceRepository(db), inject: [DATABASE] },
   ],
-  exports: [DATABASE, RawArtifactRepository, DedupRepository, ProcessingRepository],
+  exports: [
+    DATABASE, RawArtifactRepository, DedupRepository, ProcessingRepository,
+    ControlNumberRepository, RelationshipRepository, DocSpecRepository, PartnerMapRepository,
+    ConnectorMapRepository, TransportInstanceRepository,
+  ],
 })
 export class DatabaseModule implements OnModuleInit, OnModuleDestroy {
   constructor(@Inject(DATABASE) private readonly db: Kysely<DB>) {}

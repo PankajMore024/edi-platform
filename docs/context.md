@@ -69,6 +69,27 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 2: durable config repositories + atomic control numbers [DB slice 3]
+
+- **D73. Config-plane persistence — repositories for master config + atomic control numbers.**
+  Built durable Kysely repos for the config plane: `ControlNumberRepository` (atomic, per-(tenant,scope)
+  allocation via a transactional upsert-increment — replaces the in-memory ControlNumberService whose
+  non-atomic/non-persistent allocation is a top real-world EDI incident; tested for monotonicity +
+  **20-way concurrent allocation with zero duplicates**), `RelationshipRepository` (the central object —
+  `trading_relationship` header with envelope-as-JSON + `relationship_document` children rewritten
+  atomically on save; round-trips the full aggregate, tenant-scoped, no orphans on update), and the flat
+  config repos `DocSpecRepository` / `PartnerMapRepository` / `ConnectorMapRepository` /
+  `TransportInstanceRepository` (promoted lookup columns + full object as JSON `definition`, verbatim
+  round-trip; connector-map has `listForConnector` for the reused-across-partners library view — this is
+  where sample-import output persists). All provided/exported by DatabaseModule. 181 tests green
+  (stable ×3), build clean. **This is storage (repos + tests), not yet hot-path-wired** — the config
+  registries used by TranslationPipeline (`MapRegistry`/`SpecRegistry`/`ConnectorInstanceStore`) are
+  still in-memory. **Slice 3b (next):** wire config through a load/cache layer (config is read-heavy;
+  a sync in-memory cache loaded from these repos avoids an async ripple through the translate hot path)
+  + swap in the durable ControlNumberRepository (async — small ripple on emit). **Slice 4:** persist the
+  `transaction` header+subtype+line rows + acks/delivery/dispatch, reconstruct canonical for emit.
+  G1/G2/G4 still open.
+
 ### 2026-08-02 — Phase 2: DB repos wired into the live pipeline [DB slice 2]
 
 - **D72. Intake stores converged to async + multi-tenant; durable repos swapped into the pipeline.**
