@@ -6,7 +6,7 @@ import { TradingRelationship } from './config.types';
 import { EmitService } from '../mapping/engine/emit.service';
 import { IngestService } from '../mapping/engine/ingest.service';
 import { EnvelopeService } from '../envelope/envelope.service';
-import { ControlNumberService } from '../envelope/control-number.service';
+import { InMemoryControlNumberService } from '../envelope/control-number.service';
 import { ConformanceValidator } from '../validation/conformance-validator';
 import { MapValidator } from '../mapping/dsl/map-validator';
 import { X12Service } from '../x12/x12.service';
@@ -45,7 +45,7 @@ describe('TranslationPipeline (engine governed by config)', () => {
     store = new RelationshipStore();
     pipeline = new TranslationPipeline(
       new EmitService(), new IngestService(), new EnvelopeService(),
-      new ControlNumberService(), new ConformanceValidator(), maps, specs,
+      new InMemoryControlNumberService(), new ConformanceValidator(), maps, specs,
     );
     maps.register('acme-850-out', SAMPLE_MAP);
     maps.register('acme-850-in', { ...SAMPLE_MAP, direction: 'inbound' } as EdiMap);
@@ -53,8 +53,8 @@ describe('TranslationPipeline (engine governed by config)', () => {
     store.upsert(rel);
   });
 
-  it('emits a full, conformant interchange driven by the relationship', () => {
-    const r = pipeline.emitDocument(rel, '850', SAMPLE_DOC, at);
+  it('emits a full, conformant interchange driven by the relationship', async () => {
+    const r = await pipeline.emitDocument(rel, '850', SAMPLE_DOC, at);
     expect(r.validation.valid).toBe(true);
     expect(r.validation.errors).toEqual([]);
     expect(r.control.isa13).toBe('000000001'); // first allocation for this relationship
@@ -66,24 +66,24 @@ describe('TranslationPipeline (engine governed by config)', () => {
     expect(edi).toContain('IEA*1*000000001');
   });
 
-  it('surfaces conformance errors from the pipeline (bad UOM code)', () => {
+  it('surfaces conformance errors from the pipeline (bad UOM code)', async () => {
     const badDoc: any = JSON.parse(JSON.stringify(SAMPLE_DOC));
     badDoc.lineItems[0].quantity.uom = 'ZZZ'; // not in the house-850 UOM code list
-    const r = pipeline.emitDocument(rel, '850', badDoc, at);
+    const r = await pipeline.emitDocument(rel, '850', badDoc, at);
     expect(r.validation.valid).toBe(false);
     expect(r.validation.errors.join(' ')).toMatch(/PO103: code "ZZZ" not allowed/);
   });
 
-  it('round-trips: ingest the emitted interchange back to canonical, validated', () => {
-    const emitted = pipeline.emitDocument(rel, '850', SAMPLE_DOC, at);
+  it('round-trips: ingest the emitted interchange back to canonical, validated', async () => {
+    const emitted = await pipeline.emitDocument(rel, '850', SAMPLE_DOC, at);
     const r = pipeline.ingestDocument(rel, emitted.interchange);
     expect(r.docType).toBe('850');
     expect((r.doc as any).poNumber).toBe('4500');
     expect(r.validation.valid).toBe(true);
   });
 
-  it('errors clearly when no config exists for the doc/direction', () => {
-    expect(() => pipeline.emitDocument(rel, '856', SAMPLE_DOC, at)).toThrow(/no enabled outbound config for 856/);
+  it('errors clearly when no config exists for the doc/direction', async () => {
+    await expect(pipeline.emitDocument(rel, '856', SAMPLE_DOC, at)).rejects.toThrow(/no enabled outbound config for 856/);
   });
 
   it('exposes catalog descriptors for the admin console', () => {

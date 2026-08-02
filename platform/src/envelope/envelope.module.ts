@@ -1,13 +1,18 @@
 import { Module } from '@nestjs/common';
 import { EnvelopeService } from './envelope.service';
 import { ControlNumberService } from './control-number.service';
+import { ControlNumberRepository } from '../db/repositories/control-number.repository';
 
 /**
- * Envelope module — ISA/GS/ST build/parse (harvested from ediTemplateParser.js, now bidirectional
- * with correct SE/GE/IEA trailers) + control-number allocation.
+ * Envelope module — ISA/GS/ST build/parse (bidirectional, correct SE/GE/IEA trailers) + control-number
+ * allocation. ControlNumberService is bound to the durable, atomic ControlNumberRepository (from the
+ * global DatabaseModule); unit tests inject InMemoryControlNumberService directly instead.
  */
 @Module({
-  providers: [EnvelopeService, ControlNumberService],
+  providers: [
+    EnvelopeService,
+    { provide: ControlNumberService, useExisting: ControlNumberRepository },
+  ],
   exports: [EnvelopeService, ControlNumberService],
 })
 export class EnvelopeModule {}

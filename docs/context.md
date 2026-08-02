@@ -69,6 +69,22 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-02 — Phase 2: durable control numbers wired into the live pipeline [DB slice 3b]
+
+- **D74. ControlNumberService made async + tenant-scoped; durable ControlNumberRepository wired into
+  the running pipeline.** Refactored `ControlNumberService` → abstract async `(tenantId, scope)` +
+  `InMemoryControlNumberService` (unit tests). `ControlNumberRepository` now `extends` it; `EnvelopeModule`
+  binds the token to the durable repo (`useExisting`, from @Global DatabaseModule) — so the app allocates
+  ISA13/GS06/ST02 **atomically from the DB, surviving restarts** (the flagged EDI-incident risk, fixed in
+  the live path). Threaded `rel.tenantId` into every allocation; `TranslationPipeline.emitDocument` +
+  `InboundPipeline.buildGroupAck` are now async (small ripple: orchestrator `Promise.all`, spec awaits +
+  `rejects.toThrow`). App boots with the durable allocator wired. 181 tests green (stable ×3), build clean.
+  **Deferred (with rationale):** the config READ-CACHE (hydrating MapRegistry/SpecRegistry/
+  ConnectorInstanceStore from the config repos) — there's no live producer/consumer yet (no provisioning
+  API, transport stubbed), so building cache+invalidation now would be untested speculative machinery.
+  It pairs naturally with the provisioning API (Phase 3 console backend). **Slice 4 next:** persist the
+  `transaction` header+subtype+line rows + acks/delivery/dispatch, reconstruct canonical for emit.
+
 ### 2026-08-02 — Phase 2: durable config repositories + atomic control numbers [DB slice 3]
 
 - **D73. Config-plane persistence — repositories for master config + atomic control numbers.**

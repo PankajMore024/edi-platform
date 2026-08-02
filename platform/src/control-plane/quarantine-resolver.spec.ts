@@ -13,7 +13,7 @@ import { ConnectorInstance } from '../connectors/connector.types';
 import { EmitService } from '../mapping/engine/emit.service';
 import { IngestService } from '../mapping/engine/ingest.service';
 import { EnvelopeService } from '../envelope/envelope.service';
-import { ControlNumberService } from '../envelope/control-number.service';
+import { InMemoryControlNumberService } from '../envelope/control-number.service';
 import { ConformanceValidator } from '../validation/conformance-validator';
 import { MapValidator } from '../mapping/dsl/map-validator';
 import { X12Service, RawSegment } from '../x12/x12.service';
@@ -75,7 +75,7 @@ describe('QuarantineResolver (operator actions on the review queue)', () => {
     new CsvConnector(new ObjectMapper(), connectors);
     const instances = new ConnectorInstanceStore();
     instances.upsert(instance);
-    const controlNumbers = new ControlNumberService();
+    const controlNumbers = new InMemoryControlNumberService();
     const pipeline = new TranslationPipeline(
       new EmitService(), new IngestService(), envelope, controlNumbers, new ConformanceValidator(), maps, specs,
     );

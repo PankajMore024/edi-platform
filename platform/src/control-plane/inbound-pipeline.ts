@@ -170,7 +170,7 @@ export class InboundPipeline {
         processed.push({ ts, conformant, delivered, deliveredPayload, validation: ingest.validation });
       }
 
-      const ack = this.buildGroupAck(rel, group, processed, timestamp);
+      const ack = await this.buildGroupAck(rel, group, processed, timestamp);
       acks.push(ack);
 
       // Record one lifecycle event per transaction set, carrying its identity + this group's ack ref.
@@ -206,12 +206,12 @@ export class InboundPipeline {
   }
 
   /** Build one 997 for a functional group, with an AK2/AK5 (+AK3/AK4) per transaction set. */
-  private buildGroupAck(
+  private async buildGroupAck(
     rel: TradingRelationship,
     group: ParsedGroup,
     processed: Array<{ ts: ParsedTransactionSet; conformant: boolean; validation: ConformanceResult }>,
     timestamp: Date,
-  ): InboundAck {
+  ): Promise<InboundAck> {
     const body = this.ack.buildBody({
       functionalIdCode: group.functionalId,
       groupControlNumber: group.groupControlNumber,
@@ -226,9 +226,9 @@ export class InboundPipeline {
     // The 997 is outbound from us to the partner — same envelope identity + control-number sequence
     // as any other outbound interchange to this relationship.
     const control: ControlNumbers = {
-      isa13: this.controlNumbers.nextPadded(`${rel.id}:isa`, 9),
-      gs06: this.controlNumbers.next(`${rel.id}:gs`),
-      st02: this.controlNumbers.nextPadded(`${rel.id}:st`, 4),
+      isa13: await this.controlNumbers.nextPadded(rel.tenantId, `${rel.id}:isa`, 9),
+      gs06: await this.controlNumbers.next(rel.tenantId, `${rel.id}:gs`),
+      st02: await this.controlNumbers.nextPadded(rel.tenantId, `${rel.id}:st`, 4),
     };
     const segments = this.envelope.buildInterchange(body, {
       config: rel.envelope,

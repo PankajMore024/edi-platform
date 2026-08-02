@@ -32,7 +32,7 @@ export class IntegrationOrchestrator {
     const instance = this.instances.get(this.requireConnector(rd));
     const connector = this.connectors.get(instance.connectorType);
     const docs = await connector.ingest(raw, instance);
-    return docs.map((doc) => this.pipeline.emitDocument(rel, docType, doc, timestamp));
+    return Promise.all(docs.map((doc) => this.pipeline.emitDocument(rel, docType, doc, timestamp)));
   }
 
   /** Partner → Customer: an X12 interchange → native payload delivered into the customer system. */

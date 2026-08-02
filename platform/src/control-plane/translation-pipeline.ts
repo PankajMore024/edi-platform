@@ -41,7 +41,7 @@ export class TranslationPipeline {
   ) {}
 
   /** Outbound: canonical document → full validated X12 interchange, driven by the relationship. */
-  emitDocument(rel: TradingRelationship, docType: DocType, doc: CanonicalDocument, timestamp: Date): EmitResult {
+  async emitDocument(rel: TradingRelationship, docType: DocType, doc: CanonicalDocument, timestamp: Date): Promise<EmitResult> {
     const rd = this.findDoc(rel, docType, 'outbound');
     const map = this.maps.get(rd.mapId);
 
@@ -49,9 +49,9 @@ export class TranslationPipeline {
     const validation = this.validateBody(body, rd);
 
     const control: ControlNumbers = {
-      isa13: this.controlNumbers.nextPadded(`${rel.id}:isa`, 9),
-      gs06: this.controlNumbers.next(`${rel.id}:gs`),
-      st02: this.controlNumbers.nextPadded(`${rel.id}:st`, 4),
+      isa13: await this.controlNumbers.nextPadded(rel.tenantId, `${rel.id}:isa`, 9),
+      gs06: await this.controlNumbers.next(rel.tenantId, `${rel.id}:gs`),
+      st02: await this.controlNumbers.nextPadded(rel.tenantId, `${rel.id}:st`, 4),
     };
 
     const interchange = this.envelope.buildInterchange(body, {

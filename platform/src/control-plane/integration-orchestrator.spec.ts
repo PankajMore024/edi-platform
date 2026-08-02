@@ -11,7 +11,7 @@ import { ConnectorInstance } from '../connectors/connector.types';
 import { EmitService } from '../mapping/engine/emit.service';
 import { IngestService } from '../mapping/engine/ingest.service';
 import { EnvelopeService } from '../envelope/envelope.service';
-import { ControlNumberService } from '../envelope/control-number.service';
+import { InMemoryControlNumberService } from '../envelope/control-number.service';
 import { ConformanceValidator } from '../validation/conformance-validator';
 import { MapValidator } from '../mapping/dsl/map-validator';
 import { X12Service } from '../x12/x12.service';
@@ -70,7 +70,7 @@ describe('IntegrationOrchestrator (customer edge ↔ engine ↔ partner edge)', 
     instances.upsert(instance);
     const pipeline = new TranslationPipeline(
       new EmitService(), new IngestService(), new EnvelopeService(),
-      new ControlNumberService(), new ConformanceValidator(), maps, specs,
+      new InMemoryControlNumberService(), new ConformanceValidator(), maps, specs,
     );
     orch = new IntegrationOrchestrator(pipeline, connectors, instances);
   });

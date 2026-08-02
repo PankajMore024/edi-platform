@@ -1,27 +1,28 @@
 import { Injectable } from '@nestjs/common';
 
 /**
- * Allocates monotonically increasing control numbers (ISA13 / GS06 / ST02), scoped by a key
- * (typically the trading relationship + level).
- *
- * ⚠️ M1 is IN-MEMORY and NOT production-safe: it does not persist and does not guard against
- * concurrent allocation. The production version must allocate ATOMICALLY from a durable store
- * (a DB sequence / SELECT … FOR UPDATE) — duplicate or raced control numbers are a top source of
- * real EDI incidents (see docs/design/quality-and-process.md). Kept minimal here on purpose.
+ * Allocates monotonically increasing control numbers (ISA13 / GS06 / ST02), scoped by (tenant, scope).
+ * Async so a durable, atomic store can back it — duplicate or raced control numbers are a top source of
+ * real EDI incidents, so the running app binds this to the DB-backed ControlNumberRepository. The
+ * in-memory implementation below is for unit tests only (non-durable, non-atomic across processes).
  */
+export abstract class ControlNumberService {
+  abstract next(tenantId: string, scope: string, start?: number): Promise<string>;
+  abstract nextPadded(tenantId: string, scope: string, width: number, start?: number): Promise<string>;
+}
+
 @Injectable()
-export class ControlNumberService {
+export class InMemoryControlNumberService extends ControlNumberService {
   private readonly counters = new Map<string, number>();
 
-  /** Return the next number for `scope`, starting at `start` on first use. */
-  next(scope: string, start = 1): string {
-    const current = this.counters.has(scope) ? (this.counters.get(scope) as number) + 1 : start;
-    this.counters.set(scope, current);
+  async next(tenantId: string, scope: string, start = 1): Promise<string> {
+    const k = `${tenantId} ${scope}`;
+    const current = this.counters.has(k) ? (this.counters.get(k) as number) + 1 : start;
+    this.counters.set(k, current);
     return String(current);
   }
 
-  /** Zero-padded variant (e.g. ISA13 width 9, ST02 width 4). */
-  nextPadded(scope: string, width: number, start = 1): string {
-    return this.next(scope, start).padStart(width, '0').slice(-width);
+  async nextPadded(tenantId: string, scope: string, width: number, start = 1): Promise<string> {
+    return (await this.next(tenantId, scope, start)).padStart(width, '0').slice(-width);
   }
 }

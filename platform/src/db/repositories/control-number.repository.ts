@@ -1,16 +1,16 @@
 import { randomUUID } from 'crypto';
 import { Kysely, sql } from 'kysely';
 import { DB } from '../schema';
+import { ControlNumberService } from '../../envelope/control-number.service';
 
 /**
- * Durable, ATOMIC control-number allocation (ISA13 / GS06 / ST02), scoped by (tenant, scope). Replaces
- * the in-memory ControlNumberService, whose non-persistence + non-atomicity is a top source of real EDI
- * incidents (duplicate/raced control numbers). The upsert-then-read runs inside a transaction so each
- * caller gets a distinct, monotonic value even under concurrency; a durable store means numbers never
- * reset on restart.
+ * Durable, ATOMIC control-number allocation (ISA13 / GS06 / ST02) — the DB implementation of
+ * ControlNumberService, scoped by (tenant, scope). The upsert-then-read runs inside a transaction so
+ * each caller gets a distinct, monotonic value even under concurrency; a durable store means numbers
+ * never reset on restart (raced/duplicate control numbers are a top real-world EDI incident).
  */
-export class ControlNumberRepository {
-  constructor(private readonly db: Kysely<DB>) {}
+export class ControlNumberRepository extends ControlNumberService {
+  constructor(private readonly db: Kysely<DB>) { super(); }
 
   /** Allocate the next number for `scope`, starting at `start` on first use. */
   async next(tenantId: string, scope: string, start = 1): Promise<string> {
