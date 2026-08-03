@@ -79,6 +79,22 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
     expect(got.body.connectorMap.header[0]).toEqual({ to: 'poNumber', from: 'PO_Number' });
   });
 
+  it('provisions specs / partner-maps / transports (the rest of the config graph)', async () => {
+    const spec = { docType: '850', version: '004010', owner: 'client', segments: [{ tag: 'BEG', requirement: 'mandatory', elements: [] }] };
+    await http().put('/api/specs/house-850').set('x-tenant-id', 't1').send(spec).expect(200);
+    expect((await http().get('/api/specs/house-850').set('x-tenant-id', 't1').expect(200)).body).toMatchObject({ docType: '850', owner: 'client' });
+    expect((await http().get('/api/specs').set('x-tenant-id', 't1').expect(200)).body.map((s: any) => s.id)).toEqual(['house-850']);
+
+    const pmap = { docType: '850', direction: 'inbound', functionalId: 'PO', segments: [] };
+    await http().put('/api/partner-maps/acme-850-in').set('x-tenant-id', 't1').send(pmap).expect(200);
+    expect((await http().get('/api/partner-maps/acme-850-in').set('x-tenant-id', 't1').expect(200)).body).toMatchObject({ docType: '850', direction: 'inbound' });
+
+    const tp = { id: 'tp-1', tenantId: 't1', transportType: 'sftp', settings: { host: 'sftp.acme.com' }, vaultRef: 'vault://1', direction: 'both' };
+    await http().put('/api/transports/tp-1').set('x-tenant-id', 't1').send(tp).expect(200);
+    expect((await http().get('/api/transports').set('x-tenant-id', 't1').expect(200)).body[0]).toMatchObject({ id: 'tp-1', transportType: 'sftp' });
+    await http().get('/api/specs/nope').set('x-tenant-id', 't1').expect(404);
+  });
+
   it('GET /api/review serves the queue; dismiss resolves it', async () => {
     const ledger = app.get(ProcessingRepository);
     const ev = await ledger.record({

@@ -46,6 +46,10 @@ export class PartnerMapRepository {
     const r = await this.db.selectFrom('partner_map').select('definition').where('tenant_id', '=', tenantId).where('id', '=', id).executeTakeFirst();
     return r ? (JSON.parse(r.definition) as EdiMap) : undefined;
   }
+  async list(tenantId: string): Promise<Array<{ id: string; map: EdiMap }>> {
+    const rows = await this.db.selectFrom('partner_map').select(['id', 'definition']).where('tenant_id', '=', tenantId).execute();
+    return rows.map((r) => ({ id: r.id, map: JSON.parse(r.definition) as EdiMap }));
+  }
 }
 
 /** connector_map — client-system ⇄ canonical (what sample-import generates), keyed by (connector, doc). */
@@ -81,5 +85,9 @@ export class TransportInstanceRepository {
   async get(tenantId: string, id: string): Promise<TransportInstance | undefined> {
     const r = await this.db.selectFrom('transport_instance').selectAll().where('tenant_id', '=', tenantId).where('id', '=', id).executeTakeFirst();
     return r ? { id: r.id, tenantId: r.tenant_id, transportType: r.transport_type, settings: JSON.parse(r.settings), vaultRef: r.vault_ref ?? undefined, direction: r.direction as TransportInstance['direction'] } : undefined;
+  }
+  async list(tenantId: string): Promise<TransportInstance[]> {
+    const rows = await this.db.selectFrom('transport_instance').selectAll().where('tenant_id', '=', tenantId).execute();
+    return rows.map((r) => ({ id: r.id, tenantId: r.tenant_id, transportType: r.transport_type, settings: JSON.parse(r.settings), vaultRef: r.vault_ref ?? undefined, direction: r.direction as TransportInstance['direction'] }));
   }
 }

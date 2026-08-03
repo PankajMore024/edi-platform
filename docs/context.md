@@ -69,6 +69,21 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: config write path complete [API slice 3]
+
+- **D79. The full config graph is now provisionable over HTTP.** Added the remaining provisioning
+  controllers: `SpecsController` (GET list/:id, PUT :id → DocSpecRepository — the specId that
+  relationship documents reference), `PartnerMapsController` (partner X12⇄canonical maps — the mapId
+  referenced by relationship documents), `TransportsController` (SFTP/webhook instances). Added `list`
+  to PartnerMapRepository + TransportInstanceRepository. With relationships (D77) + connector instances
+  (D78) + specs + partner-maps + transports, **every config object a relationship binds is now
+  API-creatable** — the provisioning write path is complete end-to-end. e2e: spec/partner-map/transport
+  PUT→GET round-trips + list + 404. 194 tests green (stable ×3), build clean. **Remaining for a live
+  console:** wire import-sample output → a saved ConnectorMap on an instance (achievable now via
+  PUT /connectors/:id with the built map — no new endpoint needed); config read-cache (so the translate
+  hot path reads API-provisioned config); auth + strict DTOs; then the React console against these
+  endpoints. G1 (engine multi-doc split) still open.
+
 ### 2026-08-03 — Phase 3: sample-import profiler + connector-instance provisioning [API slice 2]
 
 - **D78. Sample-import profiler (G2 resolved) + connector-instance provisioning.** Built the
