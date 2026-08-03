@@ -165,3 +165,15 @@ This is genuine engine work, not a UI stub — it is the long pole of this featu
 4. RBAC / partner login.
 5. The board UI over the API (the interactive mock is the target).
 6. AI at the edges: emit reference samples; explain a failed file + propose the fix.
+
+## 6. Progress — inbound validation (step 2)
+
+- **855 (PO Acknowledgment): DONE.** `validation/specs/house855.ts` (house conformance spec),
+  `validation/correlation.ts` (`correlateAckToOrder` — PO match + per-product ordered/acked
+  aggregation → `po-mismatch` / `unknown-line` / `qty-exceeds`), proven end-to-end in
+  `validation/inbound-855.spec.ts` (9 tests): a real partner 855 wire → conforms → ingests to
+  canonical → round-trips → conformance defects caught (missing PO, bad ACK code) → correlates to
+  the 850. The engine was already symmetric (same map emits & ingests); the gap was the house spec
+  + correlation, now closed. This is the template for the rest.
+- **Remaining:** 856 (BSN + HL hierarchy correlation), 810 (invoice → PO + amount reconciliation),
+  846 (inventory — standalone, no anchor), 997 (AK1↔our GS control acknowledgment).

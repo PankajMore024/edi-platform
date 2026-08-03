@@ -69,6 +69,24 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: inbound validation for 855 [certification long-pole, step 1]
+
+- **D88. Inbound validation for the first response doc (855) — the certification long pole, started.**
+  The board validates dropped 855/856/810/846/997 files, but the engine only round-tripped 850. Closed
+  that for 855: `validation/specs/house855.ts` (house conformance spec — real X12 004010 855 code lists),
+  `validation/correlation.ts` (cross-doc `correlateAckToOrder`: PO-number match + per-product
+  ordered-vs-acked aggregation → `po-mismatch` / `unknown-line` / `qty-exceeds`; pure, canonical-only,
+  the template for 856/810 correlation). Proven in `validation/inbound-855.spec.ts` (9 tests): a real
+  partner 855 wire body → conforms to house855 → ingests to canonical Ack855 → round-trips → conformance
+  defects caught (missing PO → err code 1, invalid ACK status → err code 7) → correlates to the 850
+  (SAMPLE_DOC). Key realization: the engine was already **symmetric** (the same map both emits and
+  ingests — the 850 round-trip proved it), so the only real gaps were the house spec + correlation.
+  204 tests green (was 196; +8, then +1 from review). **Self-reviewed (code-review high):** one real
+  finding — qty-exceeds compared each ack line to the aggregate order qty without summing the ack side,
+  so a SKU split across ACK lines could over-acknowledge undetected; fixed (aggregate both sides) +
+  regression test. **Remaining response docs:** 856 (HL hierarchy), 810 (amount reconciliation), 846
+  (standalone), 997 (GS-control ack). Progress tracked in onboarding-certification.md §6.
+
 ### 2026-08-03 — Phase 3: transactions pills + certification spec [console slice 7]
 
 - **D87. Transactions screen (doc-type pills) + approved certification data model.** Two things.
