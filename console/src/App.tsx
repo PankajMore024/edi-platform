@@ -5,15 +5,17 @@ import { Catalog } from './views/Catalog';
 import { Documents } from './views/Documents';
 import { Review } from './views/Review';
 import { Partners } from './views/Partners';
+import { Library } from './views/Library';
 
-type View = 'review' | 'documents' | 'partners' | 'catalog';
+type View = 'review' | 'documents' | 'partners' | 'catalog' | 'library';
 const NAV: Array<{ grp: string; items: Array<[View, string, string]> }> = [
   { grp: 'Operate', items: [['review', 'Review queue', '⚑'], ['documents', 'Documents', '▦']] },
-  { grp: 'Configure', items: [['partners', 'Partners', '⚏'], ['catalog', 'Connectors & transports', '◆']] },
+  { grp: 'Configure', items: [['partners', 'Partners', '⚏'], ['catalog', 'Connectors & transports', '◆'], ['library', 'Maps & specs', '❏']] },
 ];
 const TITLE: Record<View, [string, string]> = {
   review: ['Operate', 'Review queue'], documents: ['Operate', 'Documents'],
   partners: ['Configure', 'Trading partners'], catalog: ['Configure', 'Connectors & transports'],
+  library: ['Configure', 'Maps & specs'],
 };
 
 function KeyGate({ onSet }: { onSet: (k: string) => void }) {
@@ -64,6 +66,7 @@ export function App() {
         {view === 'documents' && <Documents />}
         {view === 'partners' && <Partners />}
         {view === 'catalog' && <Catalog />}
+        {view === 'library' && <Library />}
       </div>
     </div>
   );

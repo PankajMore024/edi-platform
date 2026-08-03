@@ -69,6 +69,27 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: map & spec authoring [console slice 5]
+
+- **D85. Map & spec authoring — new `Library` view (Configure → Maps & specs).** Lists partner maps
+  (`GET /partner-maps`) and conformance specs (`GET /specs`); the deepest config artifacts a
+  relationship references, now editable in the console instead of API-only. **Two altitudes, chosen to
+  fit each shape (not one generic editor):**
+  - **`SpecForm` — structured editor.** DocSpec is flat enough for real form UI: header (id/name/docType/
+    version/owner) + repeating segment cards (tag/name/requirement/maxUse), each with an element table
+    (pos/name/requirement/type/min/max/codes). Writes `DocSpec` via `PUT /specs/:id`. Empty optionals
+    pruned; id locked on edit.
+  - **`MapForm` — validated JSON editor, deliberately NOT a visual canvas.** X12 maps are code-like
+    (loops, qualifiers, formats); the deep-research verdict is that visual field-mappers are a usability
+    trap power users abandon. So: header meta inputs + a monospace JSON editor for `structure`, with
+    live client-side validation (parse + each node needs `segment`|`loop`), a **live structure outline**
+    (walks the tree, shows segments/loops/element counts/`over`), a per-docType **template scaffold**, and
+    Format. Assembles a correct `EdiMap` (uses `structure`, the real field — the e2e's `segments:[]`
+    fixture was just loose) via `PUT /partner-maps/:id`. Copy is explicit about why it's JSON, not a canvas.
+  Payloads match the green config-graph e2e. **Console provisioning is now complete end-to-end**: maps/
+  specs → connectors/transports → relationships → operate. Next: (a) stitch these into one guided
+  new-partner flow. **Still deferred:** live transport drain; AI-assisted map authoring.
+
 ### 2026-08-03 — Phase 3: transport form [console slice 4]
 
 - **D84. Transport provisioning form in the Catalog view.** Completes the provisioning axis. Catalog now

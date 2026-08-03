@@ -40,6 +40,14 @@ export interface ConnectorFieldMap { to: string; from?: string; const?: string |
 export interface ConnectorMap { connector: string; docType: string; direction: string; header: ConnectorFieldMap[]; lineTo?: string; lineOver?: string; lineFields?: ConnectorFieldMap[]; }
 export interface ConnectorInstance { id: string; tenantId: string; connectorType: string; settings: Record<string, unknown>; connectorMap: ConnectorMap; docTypes: string[]; trigger: string; }
 export interface TransportInstance { id: string; tenantId: string; transportType: string; settings: Record<string, unknown>; vaultRef?: string; direction: string; }
+
+// Conformance spec (structured) — mirror of the backend DocSpec / SegmentSpec / ElementSpec.
+export interface ElementSpec { pos: number; name?: string; requirement: string; type?: string; min?: number; max?: number; codes?: string[]; }
+export interface SegmentSpec { tag: string; name?: string; requirement: string; maxUse?: number; elements: ElementSpec[]; }
+export interface DocSpec { docType: string; version: string; owner: string; name?: string; segments: SegmentSpec[]; }
+
+// Partner map (X12 ⇄ canonical DSL). `structure` is the node tree — authored as validated JSON.
+export interface EdiMap { partner: string; docType: string; direction: string; functionalId?: string; version?: string; structure: unknown[]; $comment?: string; }
 export interface DocSummary { id: string; docType: string; poNumber?: string; currentState: string; conformant: boolean; }
 export interface StoredTransaction { id: string; docType: string; direction: string; poNumber?: string; currentState: string; conformant: boolean; canonical: Record<string, unknown>; }
 export interface ReviewItem {
@@ -59,7 +67,11 @@ export const api = {
   relationship: (id: string) => req<Relationship>(`/relationships/${id}`),
   saveRelationship: (id: string, rel: Relationship) => req<Relationship>(`/relationships/${id}`, { method: 'PUT', body: JSON.stringify(rel) }),
   partnerMaps: () => req<MapRef[]>('/partner-maps'),
+  partnerMap: (id: string) => req<EdiMap>(`/partner-maps/${id}`),
+  saveMap: (id: string, map: EdiMap) => req<{ id: string }>(`/partner-maps/${id}`, { method: 'PUT', body: JSON.stringify(map) }),
   specs: () => req<SpecRef[]>('/specs'),
+  spec: (id: string) => req<DocSpec>(`/specs/${id}`),
+  saveSpec: (id: string, spec: DocSpec) => req<{ id: string }>(`/specs/${id}`, { method: 'PUT', body: JSON.stringify(spec) }),
   connectors: () => req<ConnectorInstanceRef[]>('/connectors'),
   saveConnector: (id: string, inst: ConnectorInstance) => req<ConnectorInstance>(`/connectors/${id}`, { method: 'PUT', body: JSON.stringify(inst) }),
   transports: () => req<TransportInstance[]>('/transports'),
