@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
  */
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  app.enableCors(); // the console is served from a different origin in dev
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   const port = process.env.PORT ?? 3000;

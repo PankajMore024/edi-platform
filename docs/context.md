@@ -69,6 +69,23 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: the operator console [console slice 1]
+
+- **D81. React console (`console/`) against the authenticated API.** Vite + React 18 + TS
+  operator console, run with `npm run dev` (Vite proxies `/api` → the backend at `:3000`). A
+  `KeyGate` takes the tenant API key (stored in `localStorage`); every request goes out as
+  `Authorization: Bearer <key>` via the typed client in `src/api.ts`, so the console is
+  tenant-scoped by the same D80 key mechanism — no separate console auth. **Views:** *Operate* —
+  `Review` (conflict/reject queue with reprocess/dismiss actions), `Documents` (every processed
+  transaction from the normalized rows; click a row to see its reconstructed canonical); *Configure*
+  — `Partners` (trading relationships), `Catalog` (connector + transport building blocks). Read-only
+  where the write path isn't wired yet ("+ Add partner" is disabled, not faked). Control-room palette
+  (slate + teal), light/dark, `useAsync` hook for load/error/reload. Added `app.enableCors()` to
+  `platform/src/main.ts` so the dev proxy origin is accepted. `npm run build` clean (automatic
+  `react-jsx` transform — no `React` import needed; `noUnusedLocals` on). **Not yet:** partner/spec
+  create-forms in the UI; live SSE/poll for queue badge; sample-import wizard. This is the read/ops
+  surface; provisioning stays API-driven until the forms land.
+
 ### 2026-08-03 — Phase 3: API auth + config read-cache [API slice 4]
 
 - **D80. API-key auth + the config read-cache.** **Auth:** DB-backed tenant API keys (`api_key` table,
