@@ -11,6 +11,7 @@ import { RelationshipRepository } from './repositories/relationship.repository';
 import { DocSpecRepository, PartnerMapRepository, ConnectorMapRepository, TransportInstanceRepository } from './repositories/config-repositories';
 import { TransactionRepository } from './repositories/transaction.repository';
 import { DbLifecycleSink } from './repositories/lifecycle-sink.repository';
+import { ConnectorInstanceRepository } from './repositories/connector-instance.repository';
 
 /**
  * Provides the shared Kysely connection + durable repositories, and bootstraps the schema on startup.
@@ -31,11 +32,13 @@ import { DbLifecycleSink } from './repositories/lifecycle-sink.repository';
     { provide: TransportInstanceRepository, useFactory: (db: Kysely<DB>) => new TransportInstanceRepository(db), inject: [DATABASE] },
     { provide: TransactionRepository, useFactory: (db: Kysely<DB>) => new TransactionRepository(db), inject: [DATABASE] },
     { provide: DbLifecycleSink, useFactory: (db: Kysely<DB>) => new DbLifecycleSink(db), inject: [DATABASE] },
+    { provide: ConnectorInstanceRepository, useFactory: (db: Kysely<DB>) => new ConnectorInstanceRepository(db), inject: [DATABASE] },
   ],
   exports: [
     DATABASE, RawArtifactRepository, DedupRepository, ProcessingRepository,
     ControlNumberRepository, RelationshipRepository, DocSpecRepository, PartnerMapRepository,
     ConnectorMapRepository, TransportInstanceRepository, TransactionRepository, DbLifecycleSink,
+    ConnectorInstanceRepository,
   ],
 })
 export class DatabaseModule implements OnModuleInit, OnModuleDestroy {

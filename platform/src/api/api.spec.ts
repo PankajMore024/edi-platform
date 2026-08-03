@@ -62,6 +62,23 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
     expect(detail.body.canonical.lineItems[0].quantity.value).toBe(2);
   });
 
+  it('POST /api/connectors/import-sample profiles a client sample; PUT persists an instance', async () => {
+    const csv = 'PO_Number,Order_Date,Item_SKU,Qty,Unit_Price\n4500,2026-07-31,A1,10,18.50\n';
+    const prof = await http().post('/api/connectors/import-sample').send({ type: 'csv', sample: csv, docType: '850' }).expect(201);
+    expect(prof.body.fields.find((f: any) => f.path === 'PO_Number').suggestion.target).toBe('poNumber');
+    expect(prof.body.fields.find((f: any) => f.path === 'Item_SKU').suggestion.target).toBe('lines[].sku');
+    await http().post('/api/connectors/import-sample').send({ type: 'csv' }).expect(400); // missing sample/docType
+
+    const inst = {
+      id: 'ci-1', tenantId: 't1', connectorType: 'csv', settings: { hasHeader: true }, docTypes: ['850'], trigger: 'file-drop',
+      connectorMap: { connector: 'csv', docType: '850', direction: 'inbound', header: [{ to: 'poNumber', from: 'PO_Number' }] },
+    };
+    await http().put('/api/connectors/ci-1').set('x-tenant-id', 't1').send(inst).expect(200);
+    const got = await http().get('/api/connectors/ci-1').set('x-tenant-id', 't1').expect(200);
+    expect(got.body).toMatchObject({ id: 'ci-1', connectorType: 'csv', docTypes: ['850'] });
+    expect(got.body.connectorMap.header[0]).toEqual({ to: 'poNumber', from: 'PO_Number' });
+  });
+
   it('GET /api/review serves the queue; dismiss resolves it', async () => {
     const ledger = app.get(ProcessingRepository);
     const ev = await ledger.record({

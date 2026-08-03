@@ -69,6 +69,27 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: sample-import profiler + connector-instance provisioning [API slice 2]
+
+- **D78. Sample-import profiler (G2 resolved) + connector-instance provisioning.** Built the
+  deterministic profiler as real backend (`connectors/sample-profiler.ts`, ported from the console
+  prototype): `profileSample({type,sample,docType})` parses a CSV (via csv-parse) or JSON payload,
+  infers per-field type, detects header-vs-line + the document key + doc count (multi-order files, G1
+  signal), and auto-suggests canonical bindings by name/synonym. **Fixed a real detection gap** a test
+  caught: with one row per document the "constant-within-group" heuristic can't tell header from line,
+  so line-ness now comes from the canonical suggestion (which knows sku/qty are line fields), falling
+  back to structural — CSV; JSON structure (array vs scalar) stays definitive. `ConnectorInstanceRepository`
+  (deferred from slice 3): persists the instance scalars in `connector_instance` + its map in
+  `connector_map` (rewritten on save), docTypes derived on read — where sample-import output lands as
+  reusable master config. `ConnectorsController`: GET/PUT instances + `POST /connectors/import-sample`
+  → profiler. e2e: import-sample suggests poNumber/lines[].sku from a CSV (+ 400 on bad input),
+  instance PUT→GET round-trip. Profiler unit tests: multi-order CSV (docKey/docCount/types/suggestions),
+  JSON (array→line, unmatched flagged), 810 fields. 193 tests green (stable ×3), build clean. **G2 done**
+  (profiler + endpoint); **G1 still open** (engine grouping of a multi-doc file into N canonical docs —
+  the profiler now DETECTS it, the ingest split is the remaining work). **Remaining API:** map/spec
+  provisioning endpoints, wiring import-sample output → a saved ConnectorMap, config read-cache, auth,
+  strict DTOs. Then the React console.
+
 ### 2026-08-02 — Phase 3: provisioning API / console backend [API slice 1]
 
 - **D77. HTTP API over the control plane.** First slice of the console/provisioning backend (NestJS
@@ -243,7 +264,7 @@ until settled.
   D70). Until then, multi-order files collapse into one giant doc. Contained, credential-free; do
   before real connector-edge go-live. Surfaced while designing the sample-import → mapping flow (admin
   console).
-- **G2. Sample-import schema profiler.** The console needs a deterministic profiler that takes a
+- **G2. Sample-import schema profiler.** ✅ RESOLVED (D78) — `connectors/sample-profiler.ts` + `POST /api/connectors/import-sample`. The console needs a deterministic profiler that takes a
   client sample (CSV/xlsx via existing parsers, or JSON/DB rowset), infers fields + types + header-vs-
   line structure + the doc key (G1), and auto-suggests bindings to canonical (name/synonym/type match;
   AI improves suggestions later). Output = a `ConnectorMap` saved to the library keyed by

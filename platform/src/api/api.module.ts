@@ -4,6 +4,7 @@ import { TransportModule } from '../transport/transport.module';
 import { ControlPlaneModule } from '../control-plane/control-plane.module';
 import { CatalogController } from './catalog.controller';
 import { RelationshipsController } from './relationships.controller';
+import { ConnectorsController } from './connectors.controller';
 import { DocumentsController } from './documents.controller';
 import { ReviewController } from './review.controller';
 
@@ -14,6 +15,6 @@ import { ReviewController } from './review.controller';
  */
 @Module({
   imports: [ConnectorsModule, TransportModule, ControlPlaneModule],
-  controllers: [CatalogController, RelationshipsController, DocumentsController, ReviewController],
+  controllers: [CatalogController, RelationshipsController, ConnectorsController, DocumentsController, ReviewController],
 })
 export class ApiModule {}
