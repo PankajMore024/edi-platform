@@ -14,6 +14,7 @@ import { ConnectorInstanceStore } from './connector-instance-store';
 import { IntegrationOrchestrator } from './integration-orchestrator';
 import { InboundPipeline } from './inbound-pipeline';
 import { QuarantineResolver } from './quarantine-resolver';
+import { ConfigLoader } from './config-loader';
 
 /**
  * Control plane — the config layer that GOVERNS the pure engine. Registries hold the declarative
@@ -32,6 +33,7 @@ import { QuarantineResolver } from './quarantine-resolver';
     IntegrationOrchestrator,
     InboundPipeline,
     QuarantineResolver,
+    ConfigLoader,
   ],
   exports: [
     MapRegistry,
@@ -42,6 +44,7 @@ import { QuarantineResolver } from './quarantine-resolver';
     IntegrationOrchestrator,
     InboundPipeline,
     QuarantineResolver,
+    ConfigLoader,
   ],
 })
 export class ControlPlaneModule {}

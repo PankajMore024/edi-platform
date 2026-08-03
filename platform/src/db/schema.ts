@@ -45,6 +45,7 @@ export interface TransportInstanceTable {
   id: string; tenant_id: string; transport_type: string; settings: Json; vault_ref: string | null; direction: string; created_at: Ts;
 }
 export interface ControlNumberSeqTable { id: string; tenant_id: string; scope: string; current_value: number; }
+export interface ApiKeyTable { id: string; tenant_id: string; name: string; key_hash: string; created_at: Ts; revoked: Bool; }
 export interface ConfigAuditTable {
   id: string; tenant_id: string; entity_type: string; entity_id: string; action: string;
   actor: string; before: Json | null; after: Json | null; at: Ts;
@@ -161,6 +162,7 @@ export interface DB {
   doc_spec: DocSpecTable;
   transport_instance: TransportInstanceTable;
   control_number_seq: ControlNumberSeqTable;
+  api_key: ApiKeyTable;
   config_audit: ConfigAuditTable;
   raw_artifact: RawArtifactTable;
   dedup_ledger: DedupLedgerTable;

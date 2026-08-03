@@ -105,6 +105,16 @@ export async function createSchema(db: Kysely<DB>): Promise<void> {
     .execute();
   await db.schema.createIndex('control_number_seq_scope').ifNotExists().on('control_number_seq').columns(['tenant_id', 'scope']).unique().execute();
 
+  await db.schema.createTable('api_key').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('name', 'text', (c) => c.notNull())
+    .addColumn('key_hash', 'text', (c) => c.notNull())
+    .addColumn('created_at', 'text', (c) => c.notNull())
+    .addColumn('revoked', 'integer', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('api_key_hash').ifNotExists().on('api_key').columns(['key_hash']).unique().execute();
+
   await db.schema.createTable('config_audit').ifNotExists()
     .addColumn('id', 'text', (c) => c.primaryKey())
     .addColumn('tenant_id', 'text', (c) => c.notNull())
@@ -346,7 +356,7 @@ export async function createSchema(db: Kysely<DB>): Promise<void> {
 /** Every table name, for verification/introspection. */
 export const ALL_TABLES = [
   'tenant', 'trading_partner', 'trading_relationship', 'relationship_document', 'connector_instance',
-  'connector_map', 'partner_map', 'doc_spec', 'transport_instance', 'control_number_seq', 'config_audit',
+  'connector_map', 'partner_map', 'doc_spec', 'transport_instance', 'control_number_seq', 'api_key', 'config_audit',
   'raw_artifact', 'dedup_ledger', 'interchange',
   'transaction', 'transaction_850', 'transaction_810', 'transaction_855', 'transaction_856',
   'transaction_line', 'transaction_line_identifier', 'transaction_line_855', 'transaction_line_856',

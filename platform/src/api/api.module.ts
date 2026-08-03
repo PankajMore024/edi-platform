@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ApiKeyGuard } from './api-key.guard';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { TransportModule } from '../transport/transport.module';
 import { ControlPlaneModule } from '../control-plane/control-plane.module';
@@ -23,5 +25,6 @@ import { ReviewController } from './review.controller';
     SpecsController, PartnerMapsController, TransportsController,
     DocumentsController, ReviewController,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ApiKeyGuard }],
 })
 export class ApiModule {}

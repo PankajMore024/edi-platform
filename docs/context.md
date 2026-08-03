@@ -69,6 +69,23 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: API auth + config read-cache [API slice 4]
+
+- **D80. API-key auth + the config read-cache.** **Auth:** DB-backed tenant API keys (`api_key` table,
+  `ApiKeyRepository` — stores only the sha256 hash; `issue` returns plaintext once). `ApiKeyGuard`
+  (global `APP_GUARD` in ApiModule) reads `Authorization: Bearer <key>` / `x-api-key`, resolves it to a
+  tenant, and sets `req.tenantId`; the `@Tenant()` decorator now reads THAT (tenant is authenticated,
+  not a spoofable header). No/invalid key → 401. Every endpoint is now genuinely tenant-scoped by the
+  key. **Config read-cache:** `ConfigLoader.hydrate(tenantId)` loads a tenant's specs / partner-maps /
+  connector-instances / relationships from the durable repos INTO the in-memory registries
+  (MapRegistry/SpecRegistry/ConnectorInstanceStore/RelationshipStore) that the translate hot path reads
+  synchronously — bridging API-provisioned config to the pipeline without making the hot path async
+  (config is read-heavy, rarely changes). Call on tenant activation / after provisioning. e2e updated
+  for auth (401 cases, tenant-from-key isolation on relationships + documents); config-loader test
+  proves DB config → registries. 196 tests green (stable ×3), build clean. **Remaining:** auto-hydrate
+  trigger (on startup / after provisioning writes / on a receive endpoint); user-level auth + roles;
+  strict DTO validation; G1 (engine multi-doc split); then the React console against these endpoints.
+
 ### 2026-08-03 — Phase 3: config write path complete [API slice 3]
 
 - **D79. The full config graph is now provisionable over HTTP.** Added the remaining provisioning
