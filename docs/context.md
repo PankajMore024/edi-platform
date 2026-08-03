@@ -69,6 +69,24 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: sample-import wizard [console slice 3]
+
+- **D83. Sample-import wizard in the Catalog view.** Closes the connector-instance loop the partner
+  form's "connector" dropdown pointed at. `Catalog` now lists *configured connectors* (from
+  `GET /api/connectors`) with an `⤢ Import sample` action opening `ImportWizard` — a two-step drawer.
+  **Step 1:** pick connector type / doc type / format (CSV|JSON) / trigger and paste a real client
+  sample. **Step 2:** `POST /api/connectors/import-sample` profiles it (server-side G2 profiler) and the
+  operator reviews a mapping table — each source field shows its sample, header/line badge, and an
+  editable canonical target (prefilled from the profiler's suggestion, datalist of per-docType canonical
+  paths, per-row skip). On save, the reviewed rows are compiled **client-side** into a `ConnectorMap`
+  (`buildMap`: header rows → `header[]`; `lines[].x` targets → `lineTo:'lines'` + relative `lineFields[]`;
+  JSON `src[].field` paths also set `lineOver`; amounts→decimal 2, quantities→decimal 0) wrapped in a
+  `ConnectorInstance` and persisted via `PUT /api/connectors/:id`. Instance-id defaults to
+  `<type>-<doc>-<hash>` (stable string hash — no Date.now/random). Payload shape is exactly the one the
+  green connectors e2e round-trips. **Note:** `buildMap` follows the profiler's canonical convention
+  (`lines[].sku` → `lineTo:'lines'`), which is the authority the rest of the pipeline reads.
+  **Still API-only:** authoring partner maps/specs, transports; live transport drain.
+
 ### 2026-08-03 — Phase 3: provisioning forms [console slice 2]
 
 - **D82. Partner provisioning forms in the console.** The `Partners` view is now a real onboarding

@@ -34,6 +34,11 @@ export interface Relationship {
 export interface MapRef { id: string; map: { partner: string; docType: string; direction: string } }
 export interface SpecRef { id: string; spec: { docType: string; version: string; owner: string; name?: string } }
 export interface ConnectorInstanceRef { id: string; connectorType: string; docTypes: string[]; trigger: string; }
+
+// Mirror of the backend ConnectorFieldMap / ConnectorMap / ConnectorInstance (write side).
+export interface ConnectorFieldMap { to: string; from?: string; const?: string | number | boolean; default?: string | number; decimal?: number; }
+export interface ConnectorMap { connector: string; docType: string; direction: string; header: ConnectorFieldMap[]; lineTo?: string; lineOver?: string; lineFields?: ConnectorFieldMap[]; }
+export interface ConnectorInstance { id: string; tenantId: string; connectorType: string; settings: Record<string, unknown>; connectorMap: ConnectorMap; docTypes: string[]; trigger: string; }
 export interface DocSummary { id: string; docType: string; poNumber?: string; currentState: string; conformant: boolean; }
 export interface StoredTransaction { id: string; docType: string; direction: string; poNumber?: string; currentState: string; conformant: boolean; canonical: Record<string, unknown>; }
 export interface ReviewItem {
@@ -55,6 +60,7 @@ export const api = {
   partnerMaps: () => req<MapRef[]>('/partner-maps'),
   specs: () => req<SpecRef[]>('/specs'),
   connectors: () => req<ConnectorInstanceRef[]>('/connectors'),
+  saveConnector: (id: string, inst: ConnectorInstance) => req<ConnectorInstance>(`/connectors/${id}`, { method: 'PUT', body: JSON.stringify(inst) }),
   documents: (q?: { docType?: string; state?: string }) => req<DocSummary[]>(`/documents${qs(q)}`),
   document: (id: string) => req<StoredTransaction>(`/documents/${id}`),
   review: () => req<ReviewItem[]>('/review'),
