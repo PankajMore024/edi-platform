@@ -184,3 +184,14 @@ section>.sec{margin-bottom:12px;}
 .gt .opt{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:1px 6px;}
 .gt .have{font-size:11px;font-weight:600;color:var(--accent-ink);background:var(--accent-wash);border-radius:5px;padding:1px 7px;}
 .gacts{display:flex;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;}
+
+/* ── transactions doc-type pills ── */
+.dpills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.dpill{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);box-shadow:var(--shadow);}
+.dpill:hover{border-color:var(--border-strong);color:var(--ink);}
+.dpill.on{border-color:var(--accent);background:var(--accent-wash);color:var(--accent-ink);}
+.dpill.empty{opacity:.55;}
+.dpill .dp-dt{font-weight:700;font-size:13px;} .dpill .dp-t{font-weight:650;font-size:13px;}
+.dpill .dp-n{font-size:12px;color:var(--faint);} .dpill.on .dp-n{color:var(--accent-ink);}
+.dpill .dp-c{font-size:11.5px;font-weight:700;min-width:20px;text-align:center;padding:1px 7px;border-radius:20px;background:var(--surface-2);color:var(--muted);}
+.dpill.on .dp-c{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent-ink);}

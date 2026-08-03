@@ -9,11 +9,11 @@ import { Library } from './views/Library';
 
 type View = 'review' | 'documents' | 'partners' | 'catalog' | 'library';
 const NAV: Array<{ grp: string; items: Array<[View, string, string]> }> = [
-  { grp: 'Operate', items: [['review', 'Review queue', '⚑'], ['documents', 'Documents', '▦']] },
+  { grp: 'Operate', items: [['review', 'Review queue', '⚑'], ['documents', 'Transactions', '▦']] },
   { grp: 'Configure', items: [['partners', 'Partners', '⚏'], ['catalog', 'Connectors & transports', '◆'], ['library', 'Maps & specs', '❏']] },
 ];
 const TITLE: Record<View, [string, string]> = {
-  review: ['Operate', 'Review queue'], documents: ['Operate', 'Documents'],
+  review: ['Operate', 'Review queue'], documents: ['Operate', 'Transactions'],
   partners: ['Configure', 'Trading partners'], catalog: ['Configure', 'Connectors & transports'],
   library: ['Configure', 'Maps & specs'],
 };

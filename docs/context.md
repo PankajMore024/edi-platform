@@ -69,6 +69,25 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: transactions pills + certification spec [console slice 7]
+
+- **D87. Transactions screen (doc-type pills) + approved certification data model.** Two things.
+  **(1) Console:** the Documents view is renamed **Transactions** and gains a doc-type **pill filter row**
+  (All + 850/855/856/810/846/997, each with a live count) that filters the table; still served from the
+  normalized `transaction` rows via `GET /documents?docType=` (durable, no cache — client-side filter is
+  just rendering a fetched read model). Replaces the ad-hoc "history at the bottom of the onboarding
+  board" the user rejected. **(2) Spec (approved, not built):** `docs/design/onboarding-certification.md`
+  defines the durable certification model behind the board — `certification_session` (states
+  draft→in_certification→holding→certified→active/superseded; gate = can't certify while a blocking issue
+  is open), `certification_doc` (one card per doc type; role/produced_by/validated_by flip with
+  format_authority), `certification_test_file` (append-only attempts; bytes reuse the existing raw_artifact
+  store), `certification_issue` (segment/element-grained rows — NOT a blob — so analytics/gate can query),
+  `certification_message` (sent AND stored, bilateral), `certification_event` (append-only feed the console
+  reads). Plus an RBAC surface (`console_user` + `user_relationship_scope`) for **partner login with
+  authority-scoped access + their own analytics**, and the flagged prerequisite: inbound ingest +
+  conformance + cross-doc correlation for 855/856/810/846/997 (today only 850 round-trips) — the long pole.
+  Design mock is the interactive certification-board artifact. Build order in the doc §5.
+
 ### 2026-08-03 — Phase 3: guided onboarding [console slice 6]
 
 - **D86. Guided partner onboarding — `GuidedOnboard` stepper.** A `✦ Guide me` action on the Partners
