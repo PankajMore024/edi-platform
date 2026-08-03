@@ -69,6 +69,22 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: transport form [console slice 4]
+
+- **D84. Transport provisioning form in the Catalog view.** Completes the provisioning axis. Catalog now
+  has a *Configured transports* panel (from `GET /api/transports`) with `+ Add transport` /
+  click-to-edit opening `TransportForm` — a drawer writing a `TransportInstance` over
+  `PUT /api/transports/:id`. Type-adaptive config: **sftp** → host / port / username / inboundPath /
+  outboundPath / pattern; **webhook** → outbound url / signatureScheme / signatureHeader. Plus direction
+  (both/inbound/outbound) and a **vaultRef** field. Crucially the form collects a vault *pointer*, never
+  the secret itself — copy in the Credentials section states passwords/keys are never entered here and
+  live pull/push stay disabled until a credentialed environment resolves the vaultRef (honest about the
+  deferred transport stubs). Empty settings are pruned; new instances get a `crypto.randomUUID()` id;
+  type is locked on edit. Payload matches the green transports e2e. Reuses the existing drawer/field CSS.
+  Console provisioning now spans the whole spine: **transport + connector (import sample) → relationship
+  (partner form) → documents/review (operate)**. **Still API-only:** authoring partner maps/specs
+  themselves; live transport drain of the dispatch queue.
+
 ### 2026-08-03 — Phase 3: sample-import wizard [console slice 3]
 
 - **D83. Sample-import wizard in the Catalog view.** Closes the connector-instance loop the partner

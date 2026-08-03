@@ -39,6 +39,7 @@ export interface ConnectorInstanceRef { id: string; connectorType: string; docTy
 export interface ConnectorFieldMap { to: string; from?: string; const?: string | number | boolean; default?: string | number; decimal?: number; }
 export interface ConnectorMap { connector: string; docType: string; direction: string; header: ConnectorFieldMap[]; lineTo?: string; lineOver?: string; lineFields?: ConnectorFieldMap[]; }
 export interface ConnectorInstance { id: string; tenantId: string; connectorType: string; settings: Record<string, unknown>; connectorMap: ConnectorMap; docTypes: string[]; trigger: string; }
+export interface TransportInstance { id: string; tenantId: string; transportType: string; settings: Record<string, unknown>; vaultRef?: string; direction: string; }
 export interface DocSummary { id: string; docType: string; poNumber?: string; currentState: string; conformant: boolean; }
 export interface StoredTransaction { id: string; docType: string; direction: string; poNumber?: string; currentState: string; conformant: boolean; canonical: Record<string, unknown>; }
 export interface ReviewItem {
@@ -61,6 +62,8 @@ export const api = {
   specs: () => req<SpecRef[]>('/specs'),
   connectors: () => req<ConnectorInstanceRef[]>('/connectors'),
   saveConnector: (id: string, inst: ConnectorInstance) => req<ConnectorInstance>(`/connectors/${id}`, { method: 'PUT', body: JSON.stringify(inst) }),
+  transports: () => req<TransportInstance[]>('/transports'),
+  saveTransport: (id: string, inst: TransportInstance) => req<TransportInstance>(`/transports/${id}`, { method: 'PUT', body: JSON.stringify(inst) }),
   documents: (q?: { docType?: string; state?: string }) => req<DocSummary[]>(`/documents${qs(q)}`),
   document: (id: string) => req<StoredTransaction>(`/documents/${id}`),
   review: () => req<ReviewItem[]>('/review'),
