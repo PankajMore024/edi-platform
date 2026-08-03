@@ -69,6 +69,22 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: provisioning forms [console slice 2]
+
+- **D82. Partner provisioning forms in the console.** The `Partners` view is now a real onboarding
+  surface, not read-only. `+ Add partner` and clicking any relationship open `PartnerForm` — a slide-in
+  drawer that creates/edits a `TradingRelationship` over `PUT /api/relationships/:id`. Sections:
+  *Identity* (partnerId — locked on edit since it's the envelope key —, name, our role, format authority,
+  version, mode), *Envelope* (ISA sender/receiver qualifier+id, GS version), *Document flows* (repeating
+  rows of docType × direction × mapId × optional specId × optional connectorInstanceId × enabled).
+  Map/spec/connector fields are `<datalist>` inputs backed by new `GET /api/partner-maps|specs|connectors`
+  list calls — pick an existing id or type a new one (maps are authored elsewhere; the flow only
+  references them). Client-side validation blocks save until partnerId, both envelope IDs, and every
+  flow's map are set; `usageIndicator` is derived from mode (P/T); empty optional refs pruned before
+  send; new relationships get a `crypto.randomUUID()` id. The exact payload shape matches the green e2e
+  at `api.spec.ts` (envelope qualifiers + documents), so the write path is covered. **Still API-only:**
+  authoring maps/specs themselves, connector-instance creation (the sample-import wizard), transports.
+
 ### 2026-08-03 — Phase 3: the operator console [console slice 1]
 
 - **D81. React console (`console/`) against the authenticated API.** Vite + React 18 + TS

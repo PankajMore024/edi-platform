@@ -23,10 +23,17 @@ async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
 // ── shapes (a lean mirror of the API responses) ──
 export interface Descriptor { id: string; kind: string; name: string; description?: string; class?: string; mode?: string; }
 export interface RelationshipDoc { docType: string; direction: string; mapId: string; specId?: string; connectorInstanceId?: string; enabled: boolean; }
-export interface Relationship {
-  id: string; tenantId: string; partnerId: string; formatAuthority: string; tenantRole: string; version: string; mode: string;
-  envelope: { senderId: string; receiverId: string; [k: string]: unknown }; documents: RelationshipDoc[]; active: boolean;
+export interface Envelope {
+  senderQualifier: string; senderId: string; receiverQualifier: string; receiverId: string; gsVersion: string;
+  usageIndicator?: string; [k: string]: unknown;
 }
+export interface Relationship {
+  id: string; tenantId: string; partnerId: string; partnerName?: string; formatAuthority: string; tenantRole: string;
+  version: string; mode: string; envelope: Envelope; documents: RelationshipDoc[]; active: boolean;
+}
+export interface MapRef { id: string; map: { partner: string; docType: string; direction: string } }
+export interface SpecRef { id: string; spec: { docType: string; version: string; owner: string; name?: string } }
+export interface ConnectorInstanceRef { id: string; connectorType: string; docTypes: string[]; trigger: string; }
 export interface DocSummary { id: string; docType: string; poNumber?: string; currentState: string; conformant: boolean; }
 export interface StoredTransaction { id: string; docType: string; direction: string; poNumber?: string; currentState: string; conformant: boolean; canonical: Record<string, unknown>; }
 export interface ReviewItem {
@@ -45,6 +52,9 @@ export const api = {
   relationships: () => req<Relationship[]>('/relationships'),
   relationship: (id: string) => req<Relationship>(`/relationships/${id}`),
   saveRelationship: (id: string, rel: Relationship) => req<Relationship>(`/relationships/${id}`, { method: 'PUT', body: JSON.stringify(rel) }),
+  partnerMaps: () => req<MapRef[]>('/partner-maps'),
+  specs: () => req<SpecRef[]>('/specs'),
+  connectors: () => req<ConnectorInstanceRef[]>('/connectors'),
   documents: (q?: { docType?: string; state?: string }) => req<DocSummary[]>(`/documents${qs(q)}`),
   document: (id: string) => req<StoredTransaction>(`/documents/${id}`),
   review: () => req<ReviewItem[]>('/review'),
