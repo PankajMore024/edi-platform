@@ -3,12 +3,14 @@ import { api, Relationship } from '../api';
 import { useAsync } from '../useAsync';
 import { Loading, ErrorBox } from '../ui';
 import { PartnerForm } from './PartnerForm';
+import { GuidedOnboard } from './GuidedOnboard';
 
 const initials = (s: string) => s.slice(0, 2).toUpperCase();
 
 export function Partners() {
   const { data, loading, error, reload } = useAsync(() => api.relationships());
   const [form, setForm] = useState<{ mode: 'new' } | { mode: 'edit'; rel: Relationship } | null>(null);
+  const [guide, setGuide] = useState(false);
   if (loading) return <Loading />;
   if (error) return <ErrorBox msg={error} />;
   const rels = data ?? [];
@@ -16,7 +18,7 @@ export function Partners() {
     <div className="view">
       <p className="intro">Trading relationships — each configures one client↔partner integration: envelope identity, format authority, transport, and the document flows.</p>
       <div className="panel">
-        <div className="panel-h"><h3>Relationships</h3><div className="spacer" /><button className="btn btn-primary btn-sm" onClick={() => setForm({ mode: 'new' })}>+ Add partner</button></div>
+        <div className="panel-h"><h3>Relationships</h3><div className="spacer" /><button className="btn btn-sm" onClick={() => setGuide(true)}>✦ Guide me</button><button className="btn btn-primary btn-sm" onClick={() => setForm({ mode: 'new' })}>+ Add partner</button></div>
         {rels.length === 0 && <div className="empty">No trading relationships configured yet. <br />Add your first partner to start processing documents.</div>}
         {rels.map((r) => (
           <div className="partner click" key={r.id} onClick={() => setForm({ mode: 'edit', rel: r })}>
@@ -34,6 +36,7 @@ export function Partners() {
       </div>
       {form?.mode === 'new' && <PartnerForm onClose={() => setForm(null)} onSaved={() => { setForm(null); reload(); }} />}
       {form?.mode === 'edit' && <PartnerForm existing={form.rel} onClose={() => setForm(null)} onSaved={() => { setForm(null); reload(); }} />}
+      {guide && <GuidedOnboard onClose={() => setGuide(false)} onDone={() => { setGuide(false); reload(); }} />}
     </div>
   );
 }

@@ -69,6 +69,22 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-03 — Phase 3: guided onboarding [console slice 6]
+
+- **D86. Guided partner onboarding — `GuidedOnboard` stepper.** A `✦ Guide me` action on the Partners
+  view opens a centered stepper that walks an operator through a new partner in natural order:
+  **1 Connector** (import sample) → **2 Transport** → **3 Translation** (map + spec) → **4 Relationship**.
+  Key design choice: it does NOT re-implement any editor — each step launches the SAME drawer built in
+  slices 3–5 (`ImportWizard`/`TransportForm`/`MapForm`/`SpecForm`/`PartnerForm`). Because every drawer
+  persists independently, by the time the operator reaches step 4 the `PartnerForm` dropdowns already
+  list what they just created (each opens fresh and re-fetches). Steps 1–3 are optional and show an
+  "N existing" badge so an operator can skip and reuse; completing a step flips it to a green check.
+  Step 4 creates the relationship and finishes (Partners reloads). Sub-drawers render as siblings of the
+  stepper backdrop (not nested) so a click on a sub-drawer's scrim doesn't bubble up and close the whole
+  guide. This closes the console onboarding UX: both a power path (Partners → + Add) and a guided path.
+  **Console provisioning + onboarding complete.** Remaining platform work is all backend/deferred: live
+  transport drain of the dispatch queue; AI-assisted map authoring; user-level auth + roles.
+
 ### 2026-08-03 — Phase 3: map & spec authoring [console slice 5]
 
 - **D85. Map & spec authoring — new `Library` view (Configure → Maps & specs).** Lists partner maps
