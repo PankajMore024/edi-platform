@@ -4,6 +4,12 @@
 > config-driven, vendor-mapped product. Append new entries at the top of the
 > Decision Log; never rewrite history — supersede it.
 
+> **⏸ PARKED 2026-08-04 — hardening/review phase active (through D94).** Feature work is paused. This
+> log is a **frozen reference** during hardening: read it to validate changes; do not append feature
+> decisions. Review/testing narrative and findings live in **`docs/hardening/`** (README + findings-log),
+> kept separate so hardening does not pollute this log. Resume feature entries here only when the
+> hardening phase closes.
+
 ## Goal
 
 Turn a working-but-hardcoded ANSI X12 EDI engine into a **flexible prototype**
