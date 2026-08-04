@@ -1,5 +1,6 @@
-// Typed client for the platform API. Auth is a tenant API key (Bearer) kept in localStorage — the
-// backend derives the tenant from the key, so there is no separate tenant selector.
+// Typed client for the platform API. Auth is a Bearer credential kept in localStorage — either a tenant
+// API key (client_admin) or a user session token from email/password login (usr_…). The backend derives
+// the principal (tenant + role + scopes) from it, so there is no separate tenant selector.
 
 const KEY_STORAGE = 'edi_api_key';
 export const getKey = (): string => localStorage.getItem(KEY_STORAGE) ?? '';
@@ -88,3 +89,40 @@ export interface SampleProfile {
   source: string; docKey?: string; docCount: number; mappedCount: number; unmatchedCount: number;
   fields: Array<{ path: string; line: boolean; type: string; sample: string; suggestion?: { target: string; confidence: number } }>;
 }
+
+// ── auth / principal ──
+export type Role = 'client_admin' | 'client_ops' | 'partner';
+/** Which side of a relationship an action is attributed to (the backend's Party), derived from a Role. */
+export type Party = 'client' | 'partner' | 'system';
+export interface Principal { role: Role; tenantId: string; userId?: string; email?: string; scopes?: string[] | null; }
+export const isClient = (p?: Principal | null): boolean => p?.role === 'client_admin' || p?.role === 'client_ops';
+export const partyOf = (r: Role): Party => (r === 'partner' ? 'partner' : 'client');
+
+// ── certification (the onboarding board) ──
+export interface CertSession { id: string; tenantId: string; relationshipId: string; formatAuthority: string; status: string; specVersion?: string; createdAt: string; certifiedAt?: string; certifiedBy?: string; }
+export interface CertDoc { id: string; sessionId: string; docType: string; role: string; direction: string; producedBy: string; validatedBy: string; referenceArtifactId?: string; status: string; blocking: boolean; attemptCount: number; updatedAt: string; }
+export interface CertIssue { id: string; segment?: string; element?: string; kind: string; severity: string; code?: string; message: string; aiSuggestion?: string; directedTo: string; status: string; }
+export interface CertTestFile { id: string; certDocId: string; uploadedBy: string; attemptNo: number; verdict: string; correlated: boolean; createdAt: string; issues: CertIssue[]; }
+export interface CertMessage { id: string; sessionId: string; authorRole: string; authorUserId?: string; body: string; createdAt: string; deliveredAt?: string; }
+export interface CertEvent { id: string; sessionId: string; actor: string; verb: string; docType?: string; detail?: string; createdAt: string; seq: number; }
+export interface SessionDetail { session: CertSession; docs: CertDoc[]; canCertify: boolean; }
+
+export const auth = {
+  login: (email: string, password: string) => req<{ token: string; role: Role; tenantId: string; scopes?: string[] }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  me: () => req<Principal>('/auth/me'),
+  logout: () => req<unknown>('/auth/logout', { method: 'POST', body: JSON.stringify({ token: getKey() }) }),
+};
+
+export const cert = {
+  sessions: () => req<CertSession[]>('/certification/sessions'),
+  open: (relationshipId: string) => req<{ session: CertSession; docs: CertDoc[] }>('/certification/sessions', { method: 'POST', body: JSON.stringify({ relationshipId }) }),
+  session: (id: string) => req<SessionDetail>(`/certification/sessions/${id}`),
+  events: (id: string) => req<CertEvent[]>(`/certification/sessions/${id}/events`),
+  messages: (id: string) => req<CertMessage[]>(`/certification/sessions/${id}/messages`),
+  postMessage: (id: string, body: { authorRole: Party; body: string }) => req<CertMessage>(`/certification/sessions/${id}/messages`, { method: 'POST', body: JSON.stringify(body) }),
+  certify: (id: string, certifiedBy: string) => req<CertSession>(`/certification/sessions/${id}/certify`, { method: 'POST', body: JSON.stringify({ certifiedBy }) }),
+  files: (docId: string) => req<CertTestFile[]>(`/certification/docs/${docId}/files`),
+  dropFile: (docId: string, bytes: string, uploadedBy: Party) => req<CertTestFile>(`/certification/docs/${docId}/files`, { method: 'POST', body: JSON.stringify({ bytes, uploadedBy }) }),
+  waive: (docId: string) => req<unknown>(`/certification/docs/${docId}/waive`, { method: 'POST', body: JSON.stringify({}) }),
+  setReference: (docId: string, bytes: string) => req<unknown>(`/certification/docs/${docId}/reference`, { method: 'POST', body: JSON.stringify({ bytes }) }),
+};

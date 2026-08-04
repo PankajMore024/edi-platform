@@ -179,7 +179,14 @@ This is genuine engine work, not a UI stub — it is the long pole of this featu
    controller enforces: partners are scoped to their relationship (list filtered; 403 outside scope) and
    cannot open/certify/waive/set-reference (client-only); they may view, drop files, message. 4 user-repo
    tests + a full RBAC e2e (partner login → scoped visibility → drop allowed → certify 403 → cross-scope 403).
-5. The board UI over the API (the interactive mock is the target).
+5. **Board UI — DONE.** `console/` gains a real Certification view + login. `LoginGate` takes email/
+   password (→ `usr_` token) or an API key; App fetches `/auth/me` for the principal and renders
+   **role-aware nav** (partner → only the board; client → full console + board). The board (per session):
+   authority header + progress + certify gate (client, enabled on `canCertify`); doc cards grouped
+   anchor/responses/standalone, each with a **drop-to-validate** file input (partner drops responses,
+   client sets the anchor reference), live verdict + conformance/correlation issues + AI suggestions +
+   waive; a bilateral **message thread** composer; and the durable **activity feed**. Wired to the D91/D92
+   endpoints; RBAC is enforced server-side (the UI just reflects it).
 6. AI at the edges: emit reference samples; explain a failed file + propose the fix.
 
 ## 6. Progress — inbound validation (step 2): **COMPLETE** for all response docs

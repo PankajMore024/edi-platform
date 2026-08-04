@@ -69,6 +69,22 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-04 — Phase 3: certification board UI [console, step 5]
+
+- **D93. The certification board is a real console view.** `console/src/views/Certification.tsx` +
+  auth/nav rework in `App.tsx`, wired to the D91/D92 endpoints. **Login:** `LoginGate` takes email/password
+  (`auth.login` → `usr_` token) OR an API key; `App` fetches `/auth/me` and renders **role-aware nav** —
+  a `partner` sees only the Certification board ("Partner Onboarding"), a client sees the full console +
+  board. **Board (per session):** authority header + `passed/total` progress + **Certify & activate**
+  (client-only, enabled on `canCertify`); doc cards grouped anchor / responses / standalone; each card a
+  **drop-to-validate** file input (reads the file text → `cert.dropFile`; the anchor is client-only
+  `setReference`), showing the latest verdict, conformance/correlation issues (segment-anchored), **AI
+  suggestions** from `issue.aiSuggestion`, and a client **waive**; a bilateral **message thread** + composer
+  (`authorRole` = partyOf(role)); the durable **activity feed** (event seq). Added `api.ts` `auth`+`cert`
+  clients + `Party`/`Role`/`Principal` types (fixed Role→Party for uploadedBy/authorRole). Build clean
+  (46 modules). RBAC is enforced server-side (D92) — the UI reflects it, never the trust boundary. Only
+  step 6 (AI at the edges) remains on the certification feature.
+
 ### 2026-08-04 — Phase 3: RBAC + partner login [board backend, step 4]
 
 - **D92. Per-user auth with authority-scoped access — partners can log into the console.** New identity
