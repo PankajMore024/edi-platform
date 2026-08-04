@@ -150,6 +150,36 @@ export interface DispatchQueueTable {
   status: string; attempts: number; next_attempt_at: string | null; created_at: Ts;
 }
 
+// ── CERTIFICATION PLANE ─────────────────────────────────────────────────────
+// Design-time onboarding: the negotiated agreement reaching "certified". Distinct from the runtime
+// lifecycle above. See docs/design/onboarding-certification.md. Bilateral + fully durable (no cache).
+export interface CertificationSessionTable {
+  id: string; tenant_id: string; relationship_id: string; format_authority: string;
+  status: string; spec_version: string | null; created_at: Ts; certified_at: Ts | null; certified_by: string | null;
+}
+export interface CertificationDocTable {
+  id: string; tenant_id: string; session_id: string; doc_type: string; role: string; direction: string;
+  produced_by: string; validated_by: string; reference_artifact_id: string | null;
+  status: string; blocking: Bool; attempt_count: number; updated_at: Ts;
+}
+export interface CertificationTestFileTable {
+  id: string; tenant_id: string; cert_doc_id: string; raw_artifact_id: string; uploaded_by: string;
+  attempt_no: number; verdict: string; correlated: Bool; created_at: Ts;
+}
+export interface CertificationIssueTable {
+  id: string; tenant_id: string; test_file_id: string; segment: string | null; element: string | null;
+  kind: string; severity: string; code: string | null; message: string; ai_suggestion: string | null;
+  directed_to: string; status: string;
+}
+export interface CertificationMessageTable {
+  id: string; tenant_id: string; session_id: string; cert_doc_id: string | null; related_issue_id: string | null;
+  author_role: string; author_user_id: string | null; body: string; created_at: Ts; delivered_at: Ts | null;
+}
+export interface CertificationEventTable {
+  id: string; tenant_id: string; session_id: string; actor: string; verb: string;
+  doc_type: string | null; detail: string | null; created_at: Ts; seq: number;
+}
+
 /** The Kysely database. Pass as `Kysely<DB>`. */
 export interface DB {
   tenant: TenantTable;
@@ -185,4 +215,10 @@ export interface DB {
   acknowledgment: AcknowledgmentTable;
   delivery: DeliveryTable;
   dispatch_queue: DispatchQueueTable;
+  certification_session: CertificationSessionTable;
+  certification_doc: CertificationDocTable;
+  certification_test_file: CertificationTestFileTable;
+  certification_issue: CertificationIssueTable;
+  certification_message: CertificationMessageTable;
+  certification_event: CertificationEventTable;
 }

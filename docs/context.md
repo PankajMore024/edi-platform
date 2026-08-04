@@ -69,6 +69,24 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-04 — Phase 3: certification tables + repository [board backend, step 1]
+
+- **D90. Durable certification plane (schema + repository).** Built the 6 tables from
+  onboarding-certification.md §2 into `db/schema.ts` + `db/migrations.ts` (+ `ALL_TABLES`, tenant-lead
+  indexes): `certification_session` / `certification_doc` / `certification_test_file` /
+  `certification_issue` / `certification_message` / `certification_event`. Domain types in
+  `control-plane/certification.types.ts`; `db/repositories/certification.repository.ts` is the aggregate:
+  createSession/getByRelationship/listSessions, addDoc/listDocs/setDocStatus, **recordTestFile** (atomic:
+  inserts file + segment/element issues, bumps attempt_count, sets doc status from verdict, logs event),
+  listTestFiles, addMessage/listMessages (bilateral thread; deliveredAt set — sent AND stored),
+  logEvent/listEvents (append-only, per-session monotonic `seq`), and the **certify GATE** —
+  `canCertify` (every blocking doc must be passed or waived) + `certify` throws otherwise. Registered in
+  DatabaseModule (@Global). Monotonic stamp (max(now, last+1)) for stable thread/feed ordering — same fix
+  the processing ledger needed (caught by a flaky message-order test, then fixed). 7 node:sqlite tests;
+  tsc clean; **229 tests green** (was 222). **RBAC tables (console_user/user_relationship_scope, §3)
+  deferred to step 4.** Next: certification API (§5 step 3) — create session, drop file → validate via
+  the D88/D89 inbound layer → recordTestFile, message, certify.
+
 ### 2026-08-04 — Phase 3: inbound validation COMPLETE for 856/810/846/997 [certification long-pole done]
 
 - **D89. Inbound validation finished for every response doc type.** Following the 855 template (D88):

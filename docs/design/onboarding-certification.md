@@ -159,8 +159,12 @@ This is genuine engine work, not a UI stub — it is the long pole of this featu
 
 ## 5. Build order
 
-1. Tables + repositories (this spec) — durable, tenant-scoped.
-2. Inbound ingest + conformance for 855/856/810/846/997 (+ correlation).
+1. **Tables + repositories — DONE.** All six tables (schema.ts + migrations.ts + ALL_TABLES) and
+   `CertificationRepository` (session/doc/test-file+issues/message/event) with the certify GATE enforced
+   in the repo (a blocking doc must be passed or waived), a per-session monotonic event `seq`, and a
+   monotonic stamp for stable thread/feed ordering. Registered in DatabaseModule. `certification.types.ts`
+   holds the domain types. 7 node:sqlite tests. **RBAC tables (§3) deferred to step 4.**
+2. Inbound ingest + conformance for 855/856/810/846/997 (+ correlation) — DONE (see §6).
 3. Certification API (create session, drop file → validate → verdict, message, certify gate).
 4. RBAC / partner login.
 5. The board UI over the API (the interactive mock is the target).

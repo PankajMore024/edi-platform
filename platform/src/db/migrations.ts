@@ -351,6 +351,89 @@ export async function createSchema(db: Kysely<DB>): Promise<void> {
     .addColumn('attempts', 'integer', (c) => c.notNull())
     .addColumn('next_attempt_at', 'text').addColumn('created_at', 'text', (c) => c.notNull())
     .execute();
+
+  // ── certification plane ──
+  await db.schema.createTable('certification_session').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('relationship_id', 'text', (c) => c.notNull())
+    .addColumn('format_authority', 'text', (c) => c.notNull())
+    .addColumn('status', 'text', (c) => c.notNull())
+    .addColumn('spec_version', 'text')
+    .addColumn('created_at', 'text', (c) => c.notNull())
+    .addColumn('certified_at', 'text').addColumn('certified_by', 'text')
+    .execute();
+  await db.schema.createIndex('certification_session_rel').ifNotExists().on('certification_session').columns(['tenant_id', 'relationship_id']).execute();
+
+  await db.schema.createTable('certification_doc').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('session_id', 'text', (c) => c.notNull())
+    .addColumn('doc_type', 'text', (c) => c.notNull())
+    .addColumn('role', 'text', (c) => c.notNull())
+    .addColumn('direction', 'text', (c) => c.notNull())
+    .addColumn('produced_by', 'text', (c) => c.notNull())
+    .addColumn('validated_by', 'text', (c) => c.notNull())
+    .addColumn('reference_artifact_id', 'text')
+    .addColumn('status', 'text', (c) => c.notNull())
+    .addColumn('blocking', 'integer', (c) => c.notNull())
+    .addColumn('attempt_count', 'integer', (c) => c.notNull())
+    .addColumn('updated_at', 'text', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('certification_doc_session').ifNotExists().on('certification_doc').columns(['session_id']).execute();
+
+  await db.schema.createTable('certification_test_file').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('cert_doc_id', 'text', (c) => c.notNull())
+    .addColumn('raw_artifact_id', 'text', (c) => c.notNull())
+    .addColumn('uploaded_by', 'text', (c) => c.notNull())
+    .addColumn('attempt_no', 'integer', (c) => c.notNull())
+    .addColumn('verdict', 'text', (c) => c.notNull())
+    .addColumn('correlated', 'integer', (c) => c.notNull())
+    .addColumn('created_at', 'text', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('certification_test_file_doc').ifNotExists().on('certification_test_file').columns(['cert_doc_id']).execute();
+
+  await db.schema.createTable('certification_issue').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('test_file_id', 'text', (c) => c.notNull())
+    .addColumn('segment', 'text').addColumn('element', 'text')
+    .addColumn('kind', 'text', (c) => c.notNull())
+    .addColumn('severity', 'text', (c) => c.notNull())
+    .addColumn('code', 'text')
+    .addColumn('message', 'text', (c) => c.notNull())
+    .addColumn('ai_suggestion', 'text')
+    .addColumn('directed_to', 'text', (c) => c.notNull())
+    .addColumn('status', 'text', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('certification_issue_file').ifNotExists().on('certification_issue').columns(['test_file_id']).execute();
+
+  await db.schema.createTable('certification_message').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('session_id', 'text', (c) => c.notNull())
+    .addColumn('cert_doc_id', 'text').addColumn('related_issue_id', 'text')
+    .addColumn('author_role', 'text', (c) => c.notNull())
+    .addColumn('author_user_id', 'text')
+    .addColumn('body', 'text', (c) => c.notNull())
+    .addColumn('created_at', 'text', (c) => c.notNull())
+    .addColumn('delivered_at', 'text')
+    .execute();
+  await db.schema.createIndex('certification_message_session').ifNotExists().on('certification_message').columns(['session_id']).execute();
+
+  await db.schema.createTable('certification_event').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('session_id', 'text', (c) => c.notNull())
+    .addColumn('actor', 'text', (c) => c.notNull())
+    .addColumn('verb', 'text', (c) => c.notNull())
+    .addColumn('doc_type', 'text').addColumn('detail', 'text')
+    .addColumn('created_at', 'text', (c) => c.notNull())
+    .addColumn('seq', 'integer', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('certification_event_session').ifNotExists().on('certification_event').columns(['session_id', 'seq']).execute();
 }
 
 /** Every table name, for verification/introspection. */
@@ -362,4 +445,6 @@ export const ALL_TABLES = [
   'transaction_line', 'transaction_line_identifier', 'transaction_line_855', 'transaction_line_856',
   'transaction_party', 'transaction_reference', 'transaction_date', 'transaction_event',
   'processing_event', 'conformance_issue', 'acknowledgment', 'delivery', 'dispatch_queue',
+  'certification_session', 'certification_doc', 'certification_test_file', 'certification_issue',
+  'certification_message', 'certification_event',
 ] as const;
