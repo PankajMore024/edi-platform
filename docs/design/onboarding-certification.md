@@ -166,14 +166,24 @@ This is genuine engine work, not a UI stub — it is the long pole of this featu
 5. The board UI over the API (the interactive mock is the target).
 6. AI at the edges: emit reference samples; explain a failed file + propose the fix.
 
-## 6. Progress — inbound validation (step 2)
+## 6. Progress — inbound validation (step 2): **COMPLETE** for all response docs
 
-- **855 (PO Acknowledgment): DONE.** `validation/specs/house855.ts` (house conformance spec),
-  `validation/correlation.ts` (`correlateAckToOrder` — PO match + per-product ordered/acked
-  aggregation → `po-mismatch` / `unknown-line` / `qty-exceeds`), proven end-to-end in
-  `validation/inbound-855.spec.ts` (9 tests): a real partner 855 wire → conforms → ingests to
-  canonical → round-trips → conformance defects caught (missing PO, bad ACK code) → correlates to
-  the 850. The engine was already symmetric (same map emits & ingests); the gap was the house spec
-  + correlation, now closed. This is the template for the rest.
-- **Remaining:** 856 (BSN + HL hierarchy correlation), 810 (invoice → PO + amount reconciliation),
-  846 (inventory — standalone, no anchor), 997 (AK1↔our GS control acknowledgment).
+All five response doc types now validate end-to-end (house spec + ingest + round-trip + correlation),
+each proven against a real partner wire body. Engine was already symmetric, so each doc = a house spec
++ (where it answers something) a correlation entry point. One shared `correlateLines` core.
+
+| Doc | House spec | Correlation | Tests |
+|---|---|---|---|
+| 855 PO Ack | `house855` | `correlateAckToOrder` → 850 (PO, unknown-line, qty-exceeds) | `inbound-855.spec` (9) |
+| 856 ASN | `house856` | `correlateShipToOrder` → 850 (HL hierarchy ingested + round-trips) | `inbound-856.spec` (4) |
+| 810 Invoice | `house810` | `correlateInvoiceToOrder` → 850 + **total↔line-sum reconcile (decimal)** | `inbound-810.spec` (5) |
+| 846 Inventory | `house846` | none — standalone feed | `inbound-846.spec` (4) |
+| 997 Func Ack | `house997` | `correlate997ToGroup` → our GS control number | `inbound-997.spec` (4) |
+
+New canonical type `Inventory846` + `SAMPLE_846_MAP/DOC` fixtures (846 was the only doc type without
+them). Correlation kinds: `po-mismatch` \| `unknown-line` \| `qty-exceeds` \| `total-mismatch` \|
+`control-mismatch`. **Known scope:** multi-order 856 ingest needs HL-level `match` rules (single-order
+round-trips today); the board's per-doc validation covers the certification case.
+
+**Long pole retired.** Next: §5 step 1 (certification tables) or step 3 (certification API) can now build
+on a validation layer that actually works for every response doc.

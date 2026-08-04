@@ -69,6 +69,23 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-04 — Phase 3: inbound validation COMPLETE for 856/810/846/997 [certification long-pole done]
+
+- **D89. Inbound validation finished for every response doc type.** Following the 855 template (D88):
+  house specs `house856/house810/house846/house997` (real X12 004010 code lists) + correlation entry
+  points sharing one `correlateLines` core in `validation/correlation.ts`. **856** (`correlateShipToOrder`):
+  the HL S→O→I hierarchy ingests into shipment→orders→items and **round-trips with regenerated HL
+  numbering** (single-order; multi-order needs HL-level `match` rules — noted). **810**
+  (`correlateInvoiceToOrder`): PO/line correlation **plus TDS-total ↔ line-sum reconciliation using
+  decimal.js** (never float). **846**: standalone inventory feed — new canonical type `Inventory846` +
+  `SAMPLE_846_MAP/DOC` fixtures (846 was the only doc type lacking them); conformance + ingest only, no
+  correlation. **997** (`correlate997ToGroup`): correlates to the GS control number WE sent, not an 850.
+  Correlation kinds now: po-mismatch/unknown-line/qty-exceeds/total-mismatch/control-mismatch. 4 new
+  spec files (17 tests): each parses a real partner wire → conforms → ingests → round-trips → correlates/
+  catches defects. tsc clean; **222 tests green** (was 205). The certification board's validation layer
+  is real for all response docs. Progress table in onboarding-certification.md §6. Next: certification
+  tables/API (§5) can now build on it.
+
 ### 2026-08-03 — Phase 3: inbound validation for 855 [certification long-pole, step 1]
 
 - **D88. Inbound validation for the first response doc (855) — the certification long pole, started.**

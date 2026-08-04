@@ -81,11 +81,19 @@ export interface Ack997 extends CanonicalDocumentBase {
   setsAccepted: string;
 }
 
-// 846 (inventory/price) follows the same flat pattern — a canonical shape + a map, no engine change.
+/** 846 — Inventory Inquiry/Advice (standalone feed). Flat: header + item availability lines. */
+export interface Inventory846 extends CanonicalDocumentBase {
+  reportType?: string;
+  referenceId?: string;
+  reportDate?: string;
+  items: LineItem[];
+}
+
 export type CanonicalDocument =
   | Order850
   | Invoice810
   | Ack855
   | Ship856
   | Ack997
+  | Inventory846
   | CanonicalDocumentBase;

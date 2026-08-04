@@ -5,6 +5,7 @@ import {
   Ack855,
   Ship856,
   Ack997,
+  Inventory846,
 } from '../canonical/types/document.types';
 
 /**
@@ -319,4 +320,43 @@ export const SAMPLE_997_DOC: Ack997 = {
   setsIncluded: '1',
   setsReceived: '1',
   setsAccepted: '1',
+};
+
+/* ---------- 846 Inventory Advice (BIA + LIN/QTY loop) — standalone feed ---------- */
+export const SAMPLE_846_MAP: EdiMap = {
+  partner: 'acme',
+  docType: '846',
+  direction: 'outbound',
+  functionalId: 'IB',
+  version: '004010',
+  structure: [
+    {
+      segment: 'BIA',
+      elements: [
+        { pos: 1, const: '00' },
+        { pos: 2, path: 'reportType' },
+        { pos: 3, path: 'referenceId' },
+        { pos: 4, path: 'reportDate', format: 'CCYYMMDD' },
+      ],
+    },
+    {
+      loop: 'LIN',
+      over: 'items',
+      segments: [
+        { segment: 'LIN', elements: [{ pos: 1, path: 'lineNumber' }, { pos: 2, const: 'UP' }, { pos: 3, path: 'ids.0.value' }] },
+        { segment: 'QTY', elements: [{ pos: 1, const: '33' }, { pos: 2, path: 'quantity.value', decimal: 0 }] },
+      ],
+    },
+  ],
+};
+
+export const SAMPLE_846_DOC: Inventory846 = {
+  meta: { docType: '846', direction: 'outbound', partner: 'acme', tenantId: 't1' },
+  reportType: 'DD',
+  referenceId: 'INV-0804',
+  reportDate: '2026-08-04',
+  items: [
+    { lineNumber: '1', quantity: { value: 120 }, ids: [{ type: 'upc', value: '012345678905' }] },
+    { lineNumber: '2', quantity: { value: 45 }, ids: [{ type: 'upc', value: '099887766554' }] },
+  ],
 };
