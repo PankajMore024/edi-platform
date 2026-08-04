@@ -141,4 +141,47 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
     // t2 cannot see t1's session.
     await http().get(`/api/certification/sessions/${sessionId}`).set('Authorization', t2).expect(404);
   });
+
+  it('RBAC: a scoped partner logs in, sees only its session, can drop a file but cannot certify', async () => {
+    // Two relationships under t1; a partner is scoped to only one of them.
+    for (const id of ['rbac-a', 'rbac-b']) {
+      const rel: TradingRelationship = {
+        id, tenantId: 'ignored', partnerId: id, formatAuthority: 'client', tenantRole: 'buyer', version: '004010', mode: 'test',
+        envelope: { senderQualifier: 'ZZ', senderId: 'US', receiverQualifier: 'ZZ', receiverId: 'P', gsVersion: '004010' },
+        documents: [{ docType: '855', direction: 'inbound', mapId: '', enabled: true }], active: true,
+      };
+      await http().put(`/api/relationships/${id}`).set('Authorization', t1).send(rel).expect(200);
+    }
+    const sA = (await http().post('/api/certification/sessions').set('Authorization', t1).send({ relationshipId: 'rbac-a' }).expect(201)).body;
+    const sB = (await http().post('/api/certification/sessions').set('Authorization', t1).send({ relationshipId: 'rbac-b' }).expect(201)).body;
+
+    // client_admin (api key) provisions a partner login scoped to rbac-a only.
+    await http().post('/api/auth/users').set('Authorization', t1).send({ email: 'partner@acme.com', password: 'pw', role: 'partner', scopes: ['rbac-a'] }).expect(201);
+
+    // login is public.
+    const login = await http().post('/api/auth/login').send({ email: 'partner@acme.com', password: 'pw' }).expect(201);
+    const pt = `Bearer ${login.body.token}`;
+    expect(login.body.role).toBe('partner');
+    expect((await http().get('/api/auth/me').set('Authorization', pt).expect(200)).body.scopes).toEqual(['rbac-a']);
+
+    // partner sees only its scoped session in the list.
+    const visible = (await http().get('/api/certification/sessions').set('Authorization', pt).expect(200)).body;
+    expect(visible.map((s: any) => s.id)).toEqual([sA.session.id]);
+
+    // partner may drop a file on its own doc...
+    const docA = sA.docs.find((d: any) => d.docType === '855');
+    const good855 = ['BAK*00*AC*4500*20260731~', 'PO1*1*10*EA*18.50**UP*012345678905~', 'ACK*IA*10*EA~', 'CTT*1~'].join('\n');
+    await http().post(`/api/certification/docs/${docA.id}/files`).set('Authorization', pt).send({ bytes: good855, uploadedBy: 'partner' }).expect(201);
+
+    // ...but cannot certify (client-only)...
+    await http().post(`/api/certification/sessions/${sA.session.id}/certify`).set('Authorization', pt).send({ certifiedBy: 'x' }).expect(403);
+
+    // ...and cannot touch the session it isn't scoped to.
+    await http().get(`/api/certification/sessions/${sB.session.id}`).set('Authorization', pt).expect(403);
+    const docB = sB.docs.find((d: any) => d.docType === '855');
+    await http().post(`/api/certification/docs/${docB.id}/files`).set('Authorization', pt).send({ bytes: good855, uploadedBy: 'partner' }).expect(403);
+
+    // the client can still certify rbac-a (its blocking 855 now passes).
+    await http().post(`/api/certification/sessions/${sA.session.id}/certify`).set('Authorization', t1).send({ certifiedBy: 'ops' }).expect(201);
+  });
 });

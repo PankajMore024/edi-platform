@@ -135,6 +135,19 @@ export class CertificationService {
   listFiles(tenantId: string, certDocId: string): Promise<CertificationTestFile[]> { return this.repo.listTestFiles(tenantId, certDocId); }
   waive(tenantId: string, certDocId: string): Promise<void> { return this.repo.setDocStatus(tenantId, certDocId, 'waived'); }
 
+  /** The relationship a session belongs to (for scope checks), or undefined if not found in the tenant. */
+  async relationshipForSession(tenantId: string, sessionId: string): Promise<string | undefined> {
+    return (await this.repo.getSession(tenantId, sessionId))?.relationshipId;
+  }
+
+  /** Resolve a doc to its session + relationship (for scope checks). */
+  async sessionForDoc(tenantId: string, certDocId: string): Promise<{ sessionId: string; relationshipId: string } | undefined> {
+    const doc = await this.repo.getDoc(tenantId, certDocId);
+    if (!doc) return undefined;
+    const relationshipId = await this.relationshipForSession(tenantId, doc.sessionId);
+    return relationshipId ? { sessionId: doc.sessionId, relationshipId } : undefined;
+  }
+
   /** Certify + activate — maps the repo's gate failure to a 409 for the API. */
   async certify(tenantId: string, sessionId: string, certifiedBy: string): Promise<CertificationSession> {
     if (!(await this.repo.canCertify(tenantId, sessionId))) {

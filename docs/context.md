@@ -69,6 +69,24 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-04 — Phase 3: RBAC + partner login [board backend, step 4]
+
+- **D92. Per-user auth with authority-scoped access — partners can log into the console.** New identity
+  plane: `console_user` / `user_relationship_scope` / `user_session` tables + `UserRepository` (passwords
+  scrypt+salt, never plaintext — proven by test; session tokens `usr_…` stored only as sha256 hash, like
+  api keys). `PrincipalGuard` **replaces** the old ApiKeyGuard as the global `APP_GUARD`: resolves an API
+  key → machine principal `client_admin` (unrestricted, so ALL existing endpoints/tests keep working) OR a
+  `usr_` token → the console_user's `Principal` (role + relationship `scopes`); sets `req.principal` +
+  `req.tenantId`. `principal.ts` (Principal type, `isClient`, `canSeeRelationship`, `@Public`,
+  `@CurrentPrincipal`). `AuthController`: public `login`, `me`, `logout`, and client_admin-only user
+  provisioning (`POST /auth/users` with role + scopes — a client onboards its partner by creating a scoped
+  `partner` login) + `users/scope`. **RBAC enforced in CertificationController**: partners are scoped to
+  their relationship (list filtered; 403 outside scope) and cannot open/certify/waive/set-reference
+  (client-only); they may view, drop files, message. Deleted dead `api-key.guard.ts`. Tests: 4 user-repo +
+  a full RBAC e2e (partner login → scoped visibility → drop allowed → certify 403 → cross-scope 403). tsc
+  clean; **241 tests green** (was 236). Certification backend complete (steps 1–4); next is step 5 — the
+  board UI over these endpoints, now built against real roles.
+
 ### 2026-08-04 — Phase 3: certification API [board backend, step 3]
 
 - **D91. Certification API — the board's backend flow, wired.** New `certification/` module composes the

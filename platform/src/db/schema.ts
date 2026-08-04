@@ -180,6 +180,16 @@ export interface CertificationEventTable {
   doc_type: string | null; detail: string | null; created_at: Ts; seq: number;
 }
 
+// ── IDENTITY PLANE (RBAC) ───────────────────────────────────────────────────
+// Per-user console login. A `partner` user is scoped to specific relationships; client roles see the
+// whole tenant. An API key remains a machine principal (client_admin). See onboarding-certification.md §3.
+export interface ConsoleUserTable {
+  id: string; tenant_id: string; email: string; role: string; // 'client_admin' | 'client_ops' | 'partner'
+  password_hash: string; password_salt: string; created_at: Ts; revoked: Bool;
+}
+export interface UserRelationshipScopeTable { id: string; user_id: string; relationship_id: string; }
+export interface UserSessionTable { id: string; user_id: string; token_hash: string; created_at: Ts; revoked: Bool; }
+
 /** The Kysely database. Pass as `Kysely<DB>`. */
 export interface DB {
   tenant: TenantTable;
@@ -221,4 +231,7 @@ export interface DB {
   certification_issue: CertificationIssueTable;
   certification_message: CertificationMessageTable;
   certification_event: CertificationEventTable;
+  console_user: ConsoleUserTable;
+  user_relationship_scope: UserRelationshipScopeTable;
+  user_session: UserSessionTable;
 }

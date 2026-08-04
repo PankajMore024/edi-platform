@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ApiKeyGuard } from './api-key.guard';
+import { PrincipalGuard } from './principal.guard';
+import { AuthController } from './auth.controller';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { TransportModule } from '../transport/transport.module';
 import { ControlPlaneModule } from '../control-plane/control-plane.module';
@@ -22,10 +23,10 @@ import { ReviewController } from './review.controller';
 @Module({
   imports: [ConnectorsModule, TransportModule, ControlPlaneModule, CertificationModule],
   controllers: [
-    CatalogController, RelationshipsController, ConnectorsController,
+    AuthController, CatalogController, RelationshipsController, ConnectorsController,
     SpecsController, PartnerMapsController, TransportsController,
     DocumentsController, ReviewController,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ApiKeyGuard }],
+  providers: [{ provide: APP_GUARD, useClass: PrincipalGuard }],
 })
 export class ApiModule {}

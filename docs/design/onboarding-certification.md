@@ -171,7 +171,14 @@ This is genuine engine work, not a UI stub — it is the long pole of this featu
    authority-derived roles), file drop, messages, events, waive, and certify (gate → 409). Built-in
    `HOUSE_SPECS` registry (config DocSpec overrides). Correlation runs when an inbound map + anchor
    reference are configured. 6 service integration tests + 1 HTTP e2e.
-4. RBAC / partner login.
+4. **RBAC / partner login — DONE.** `console_user` + `user_relationship_scope` + `user_session` tables;
+   `UserRepository` (scrypt+salt passwords, sha256-hashed session tokens). `PrincipalGuard` (replaces
+   ApiKeyGuard as the global guard) resolves an API key → machine `client_admin` OR a `usr_` token →
+   the console_user's principal (role + scopes); sets `req.principal` + `req.tenantId`. `@Public()` login,
+   `AuthController` (login/me/logout + client_admin user-provisioning & scoping). The certification
+   controller enforces: partners are scoped to their relationship (list filtered; 403 outside scope) and
+   cannot open/certify/waive/set-reference (client-only); they may view, drop files, message. 4 user-repo
+   tests + a full RBAC e2e (partner login → scoped visibility → drop allowed → certify 403 → cross-scope 403).
 5. The board UI over the API (the interactive mock is the target).
 6. AI at the edges: emit reference samples; explain a failed file + propose the fix.
 

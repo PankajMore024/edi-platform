@@ -434,6 +434,35 @@ export async function createSchema(db: Kysely<DB>): Promise<void> {
     .addColumn('seq', 'integer', (c) => c.notNull())
     .execute();
   await db.schema.createIndex('certification_event_session').ifNotExists().on('certification_event').columns(['session_id', 'seq']).execute();
+
+  // ── identity plane (RBAC) ──
+  await db.schema.createTable('console_user').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('email', 'text', (c) => c.notNull())
+    .addColumn('role', 'text', (c) => c.notNull())
+    .addColumn('password_hash', 'text', (c) => c.notNull())
+    .addColumn('password_salt', 'text', (c) => c.notNull())
+    .addColumn('created_at', 'text', (c) => c.notNull())
+    .addColumn('revoked', 'integer', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('console_user_email').ifNotExists().on('console_user').columns(['email']).unique().execute();
+
+  await db.schema.createTable('user_relationship_scope').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('user_id', 'text', (c) => c.notNull())
+    .addColumn('relationship_id', 'text', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('user_relationship_scope_user').ifNotExists().on('user_relationship_scope').columns(['user_id']).execute();
+
+  await db.schema.createTable('user_session').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('user_id', 'text', (c) => c.notNull())
+    .addColumn('token_hash', 'text', (c) => c.notNull())
+    .addColumn('created_at', 'text', (c) => c.notNull())
+    .addColumn('revoked', 'integer', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('user_session_token').ifNotExists().on('user_session').columns(['token_hash']).unique().execute();
 }
 
 /** Every table name, for verification/introspection. */
@@ -447,4 +476,5 @@ export const ALL_TABLES = [
   'processing_event', 'conformance_issue', 'acknowledgment', 'delivery', 'dispatch_queue',
   'certification_session', 'certification_doc', 'certification_test_file', 'certification_issue',
   'certification_message', 'certification_event',
+  'console_user', 'user_relationship_scope', 'user_session',
 ] as const;
