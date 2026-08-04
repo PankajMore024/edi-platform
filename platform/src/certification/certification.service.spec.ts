@@ -44,7 +44,7 @@ describe('CertificationService (orchestration, node:sqlite)', () => {
     x12 = new X12Service();
     svc = new CertificationService(
       new CertificationRepository(db), new RawArtifactRepository(db), new RelationshipRepository(db),
-      new DocSpecRepository(db), new PartnerMapRepository(db), x12, new IngestService(), new ConformanceValidator(),
+      new DocSpecRepository(db), new PartnerMapRepository(db), x12, new IngestService(), new EmitService(), new ConformanceValidator(),
     );
     const maps = new PartnerMapRepository(db);
     await new RelationshipRepository(db).save(REL);
@@ -106,6 +106,28 @@ describe('CertificationService (orchestration, node:sqlite)', () => {
     expect(detail.canCertify).toBe(true);
     const certified = await svc.certify('t1', session.id, 'ops@client');
     expect(certified.status).toBe('certified');
+  });
+
+  it('attaches a plain-English AI suggestion to each validation issue', async () => {
+    const { response } = await openWithAnchor();
+    const tf = await svc.dropFile('t1', response.id, MALFORMED_855, 'partner');
+    expect(tf.issues.length).toBeGreaterThan(0);
+    expect(tf.issues.every((i) => typeof i.aiSuggestion === 'string' && i.aiSuggestion.length > 0)).toBe(true);
+  });
+
+  it('auto-generates the anchor reference from the map, and it works as a correlation order', async () => {
+    const { session, docs } = await svc.openSession('t1', 'rel-1');
+    const anchor = docs.find((d) => d.role === 'anchor')!;
+    const response = docs.find((d) => d.docType === '855')!;
+    await svc.generateReference('t1', anchor.id); // emit SMPL 850 from the map, set as reference
+
+    // The generated 850 (PO SMPL0001) becomes the correlation order: a 855 acking SMPL0001 correlates.
+    const smplAck = ['BAK*00*AC*SMPL0001*20260101~', 'PO1*1*1*EA*1.00**UP*000000000000~', 'ACK*IA*1*EA~', 'CTT*1~'].join('\n');
+    const tf = await svc.dropFile('t1', response.id, smplAck, 'partner');
+    expect(tf.verdict).toBe('passed');
+    expect(tf.correlated).toBe(true);
+    const detail = await svc.getSessionDetail('t1', session.id);
+    expect(detail.docs.find((d) => d.role === 'anchor')!.referenceArtifactId).toBeDefined();
   });
 
   it('records every step in the durable event feed', async () => {

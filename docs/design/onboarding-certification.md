@@ -187,7 +187,17 @@ This is genuine engine work, not a UI stub — it is the long pole of this featu
    client sets the anchor reference), live verdict + conformance/correlation issues + AI suggestions +
    waive; a bilateral **message thread** composer; and the durable **activity feed**. Wired to the D91/D92
    endpoints; RBAC is enforced server-side (the UI just reflects it).
-6. AI at the edges: emit reference samples; explain a failed file + propose the fix.
+6. **AI at the edges — DONE (deterministic scaffold).** `suggestion.ts`: a rule-based engine mapping every
+   conformance error code (segment/element level) + correlation kind → a plain-English fix, attached as
+   `aiSuggestion` on each issue in `dropFile` (the board already renders it); returns undefined for unknown
+   codes (no fabricated advice). `reference-templates.ts` + `generateReference`: emit a representative
+   conforming canonical (SMPL… values) per doc type through the configured map → the gold reference wire,
+   auto-set on the anchor (no hand-upload); `POST /docs/:id/generate-reference` (client-only) + a console
+   "Generate reference from map" button. A model can later refine the suggestion strings / synthesize
+   richer samples — the interfaces are in place; the engine stays deterministic. Tests: 4 suggestion + 2
+   service (issues carry suggestions; generated 850 works as a correlation order).
+
+**The certification/onboarding feature is complete end-to-end (steps 1–6).**
 
 ## 6. Progress — inbound validation (step 2): **COMPLETE** for all response docs
 

@@ -69,6 +69,23 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-04 — Phase 3: AI at the edges [certification step 6 — feature COMPLETE]
+
+- **D94. AI-edge scaffolding (deterministic).** Two credential-free pieces completing the onboarding
+  feature. **(1) Suggestion engine** (`certification/suggestion.ts`): `suggestConformance` maps every X12
+  syntax error code by level (segment 2/3/5, element 1/4/5/6/7/8/9) → a plain-English fix; `suggestCorrelation`
+  maps po-mismatch/unknown-line/qty-exceeds/total-mismatch/control-mismatch. Wired into
+  `CertificationService.dropFile` so every conformance/correlation issue carries `aiSuggestion` (the board
+  card already renders it). Returns undefined for unknown codes — no fabricated advice. **(2) Reference
+  emission** (`certification/reference-templates.ts` + `generateReference`): a conforming canonical
+  template per doc type (SMPL… placeholder values) emitted through the configured map → the gold reference
+  wire, auto-set on the anchor (client no longer hand-uploads). `POST /certification/docs/:id/
+  generate-reference` (client-only) + console "✦ Generate reference from map" button on the anchor card.
+  A model can later refine suggestion text / richer samples — deterministic interfaces are in place (AI at
+  edges, hot path deterministic — the locked principle). Tests: 4 suggestion unit + 2 service (issues carry
+  suggestions; the generated SMPL 850 works as a real correlation order → good 855 passes). tsc clean;
+  **247 tests green** (was 241). **Certification/onboarding feature COMPLETE (steps 1–6).**
+
 ### 2026-08-04 — Phase 3: certification board UI [console, step 5]
 
 - **D93. The certification board is a real console view.** `console/src/views/Certification.tsx` +

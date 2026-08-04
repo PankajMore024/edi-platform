@@ -125,4 +125,5 @@ export const cert = {
   dropFile: (docId: string, bytes: string, uploadedBy: Party) => req<CertTestFile>(`/certification/docs/${docId}/files`, { method: 'POST', body: JSON.stringify({ bytes, uploadedBy }) }),
   waive: (docId: string) => req<unknown>(`/certification/docs/${docId}/waive`, { method: 'POST', body: JSON.stringify({}) }),
   setReference: (docId: string, bytes: string) => req<unknown>(`/certification/docs/${docId}/reference`, { method: 'POST', body: JSON.stringify({ bytes }) }),
+  generateReference: (docId: string) => req<{ bytes: string }>(`/certification/docs/${docId}/generate-reference`, { method: 'POST', body: JSON.stringify({}) }),
 };

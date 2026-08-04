@@ -85,6 +85,14 @@ export class CertificationController {
     return this.svc.setReference(tenantId, docId, body.bytes);
   }
 
+  /** Auto-emit the gold reference sample from the configured map (client-only). */
+  @Post('docs/:docId/generate-reference')
+  async generateReference(@Tenant() tenantId: string, @CurrentPrincipal() p: Principal, @Param('docId') docId: string) {
+    this.assertClient(p);
+    await this.assertDocAccess(tenantId, p, docId);
+    return { bytes: await this.svc.generateReference(tenantId, docId) };
+  }
+
   @Post('docs/:docId/files')
   async dropFile(@Tenant() tenantId: string, @CurrentPrincipal() p: Principal, @Param('docId') docId: string, @Body() body: { bytes?: string; uploadedBy?: Party }) {
     await this.assertDocAccess(tenantId, p, docId);

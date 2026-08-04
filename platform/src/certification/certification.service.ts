@@ -5,9 +5,12 @@ import { RelationshipRepository } from '../db/repositories/relationship.reposito
 import { DocSpecRepository, PartnerMapRepository } from '../db/repositories/config-repositories';
 import { X12Service } from '../x12/x12.service';
 import { IngestService } from '../mapping/engine/ingest.service';
+import { EmitService } from '../mapping/engine/emit.service';
 import { ConformanceValidator } from '../validation/conformance-validator';
 import { HOUSE_SPECS } from '../validation/specs/house-registry';
 import { correlateToOrder } from '../validation/correlation';
+import { suggestConformance, suggestCorrelation } from './suggestion';
+import { REFERENCE_TEMPLATES } from './reference-templates';
 import {
   CertificationSession, CertificationDoc, CertificationTestFile, CertDocRole, Party, Verdict,
 } from '../control-plane/certification.types';
@@ -28,6 +31,7 @@ export class CertificationService {
     private readonly maps: PartnerMapRepository,
     private readonly x12: X12Service,
     private readonly ingest: IngestService,
+    private readonly emit: EmitService,
     private readonly conformance: ConformanceValidator,
   ) {}
 
@@ -51,6 +55,23 @@ export class CertificationService {
       }));
     }
     return { session, docs };
+  }
+
+  /**
+   * Auto-generate the authoritative side's reference sample: emit a representative canonical for the
+   * doc's type through the configured map, and store it as the reference. Deterministic (no hand-upload).
+   */
+  async generateReference(tenantId: string, certDocId: string): Promise<string> {
+    const doc = await this.repo.getDoc(tenantId, certDocId);
+    if (!doc) throw new NotFoundException(`certification doc ${certDocId} not found`);
+    const session = await this.repo.getSession(tenantId, doc.sessionId);
+    const map = session && (await this.resolveMap(tenantId, session.relationshipId, doc.docType));
+    if (!map) throw new NotFoundException(`no map configured for ${doc.docType} — cannot generate a reference`);
+    const template = REFERENCE_TEMPLATES[doc.docType];
+    if (!template) throw new NotFoundException(`no reference template for ${doc.docType}`);
+    const bytes = this.x12.serialize(this.emit.emit(template, map));
+    await this.setReference(tenantId, certDocId, bytes);
+    return bytes;
   }
 
   /** Store the authoritative side's reference sample bytes for a doc (e.g. our gold 850 the anchor). */
@@ -86,7 +107,7 @@ export class CertificationService {
         issues.push({
           segment: i.segmentTag, element: i.elementPosition != null ? String(i.elementPosition) : undefined,
           kind: 'conformance', severity: 'error', code: i.errorCode, message: i.message,
-          directedTo: doc.producedBy, status: 'open',
+          aiSuggestion: suggestConformance(i), directedTo: doc.producedBy, status: 'open',
         });
       }
     }
@@ -102,7 +123,7 @@ export class CertificationService {
         if (corr) {
           correlated = corr.correlated;
           for (const c of corr.issues) {
-            issues.push({ kind: 'correlation', severity: 'error', code: c.kind, message: c.message, directedTo: doc.producedBy, status: 'open', segment: c.ref });
+            issues.push({ kind: 'correlation', severity: 'error', code: c.kind, message: c.message, aiSuggestion: suggestCorrelation(c.kind, c.ref), directedTo: doc.producedBy, status: 'open', segment: c.ref });
           }
         }
       }
@@ -190,5 +211,5 @@ interface RecordedIssue {
   segment?: string; element?: string;
   kind: 'conformance' | 'correlation' | 'ambiguity' | 'code-value';
   severity: 'error' | 'warning' | 'info';
-  code?: string; message: string; directedTo: Party; status: 'open' | 'resolved' | 'waived';
+  code?: string; message: string; aiSuggestion?: string; directedTo: Party; status: 'open' | 'resolved' | 'waived';
 }

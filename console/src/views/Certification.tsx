@@ -26,9 +26,10 @@ function CertCard({ doc, principal, onChange }: { doc: CertDoc; principal: Princ
   };
 
   const waive = async () => { setBusy(true); try { await cert.waive(doc.id); onChange(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } };
+  const generate = async () => { setBusy(true); setErr(null); try { await cert.generateReference(doc.id); onChange(); } catch (x) { setErr((x as Error).message); } finally { setBusy(false); } };
 
   const canUpload = isAnchor ? isClient(principal) : true; // anchor reference is client-only; responses anyone with access
-  const uploadLabel = isAnchor ? 'Set reference file' : `Drop ${uploadedBy === 'partner' ? 'your' : 'the'} ${doc.docType} test file`;
+  const uploadLabel = isAnchor ? 'Upload a reference file' : `Drop ${uploadedBy === 'partner' ? 'your' : 'the'} ${doc.docType} test file`;
 
   return (
     <div className={`card cert-${doc.status}`}>
@@ -40,10 +41,13 @@ function CertCard({ doc, principal, onChange }: { doc: CertDoc; principal: Princ
           <Pill kind={kindFor(doc.status)} label={doc.status} />
         </div>
 
+        {isAnchor && isClient(principal) && (
+          <button className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={generate} disabled={busy}>{busy ? 'Generating…' : '✦ Generate reference from map'}</button>
+        )}
         {canUpload && (
           <label className="drop pick">
             <input ref={fileRef} type="file" accept=".edi,.x12,.txt" style={{ display: 'none' }} onChange={onFile} disabled={busy} />
-            <span className="up">⤒</span>{busy ? 'Validating…' : uploadLabel}<br /><span style={{ fontSize: 11 }}>.edi / .x12 · validated on drop</span>
+            <span className="up">⤒</span>{busy ? 'Working…' : uploadLabel}<br /><span style={{ fontSize: 11 }}>.edi / .x12 · validated on drop</span>
           </label>
         )}
         {err && <div className="error" style={{ margin: 0 }}>⚠ {err}</div>}
