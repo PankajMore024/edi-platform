@@ -17,11 +17,19 @@ import { ConnectorInstanceRepository } from './db/repositories/connector-instanc
 import { TransactionRepository } from './db/repositories/transaction.repository';
 import { ProcessingRepository } from './db/repositories/processing.repository';
 import { CertificationRepository } from './db/repositories/certification.repository';
+import { RawArtifactRepository } from './db/repositories/raw-artifact.repository';
+import { CertificationService } from './certification/certification.service';
+import { X12Service } from './x12/x12.service';
+import { IngestService } from './mapping/engine/ingest.service';
+import { EmitService } from './mapping/engine/emit.service';
+import { ConformanceValidator } from './validation/conformance-validator';
 import { HOUSE_850 } from './validation/specs/house850';
 import { HOUSE_855 } from './validation/specs/house855';
 import { HOUSE_856 } from './validation/specs/house856';
 import { HOUSE_810 } from './validation/specs/house810';
-import { SAMPLE_MAP, SAMPLE_DOC, SAMPLE_855_MAP, SAMPLE_855_DOC, SAMPLE_856_MAP, SAMPLE_856_DOC, SAMPLE_810_MAP, SAMPLE_810_DOC } from './testing/fixtures';
+import { HOUSE_846 } from './validation/specs/house846';
+import { HOUSE_997 } from './validation/specs/house997';
+import { SAMPLE_MAP, SAMPLE_DOC, SAMPLE_855_MAP, SAMPLE_855_DOC, SAMPLE_856_MAP, SAMPLE_856_DOC, SAMPLE_810_MAP, SAMPLE_810_DOC, SAMPLE_846_MAP, SAMPLE_997_MAP } from './testing/fixtures';
 import { TradingRelationship, RelationshipDocument } from './control-plane/config.types';
 import { CanonicalDocument } from './canonical/types/document.types';
 
@@ -46,9 +54,11 @@ async function main(): Promise<void> {
   const specs = new DocSpecRepository(db);
   await specs.save(T, 'house-850', HOUSE_850); await specs.save(T, 'house-855', HOUSE_855);
   await specs.save(T, 'house-856', HOUSE_856); await specs.save(T, 'house-810', HOUSE_810);
+  await specs.save(T, 'house-846', HOUSE_846); await specs.save(T, 'house-997', HOUSE_997);
   const maps = new PartnerMapRepository(db);
   await maps.save(T, 'ridgeline-850-out', SAMPLE_MAP); await maps.save(T, 'ridgeline-855-in', SAMPLE_855_MAP);
   await maps.save(T, 'ridgeline-856-in', SAMPLE_856_MAP); await maps.save(T, 'ridgeline-810-in', SAMPLE_810_MAP);
+  await maps.save(T, 'ridgeline-846-in', SAMPLE_846_MAP); await maps.save(T, 'ridgeline-997-in', SAMPLE_997_MAP);
 
   await new ConnectorInstanceRepository(db).save({
     id: 'csv-ridgeline', tenantId: T, connectorType: 'csv', settings: { hasHeader: true },
@@ -67,6 +77,8 @@ async function main(): Promise<void> {
     { docType: '855', direction: 'inbound', mapId: 'ridgeline-855-in', specId: 'house-855', connectorInstanceId: 'csv-ridgeline', enabled: true },
     { docType: '856', direction: 'inbound', mapId: 'ridgeline-856-in', specId: 'house-856', connectorInstanceId: 'csv-ridgeline', enabled: true },
     { docType: '810', direction: 'inbound', mapId: 'ridgeline-810-in', specId: 'house-810', connectorInstanceId: 'csv-ridgeline', enabled: true },
+    { docType: '846', direction: 'inbound', mapId: 'ridgeline-846-in', specId: 'house-846', connectorInstanceId: 'csv-ridgeline', enabled: true },
+    { docType: '997', direction: 'inbound', mapId: 'ridgeline-997-in', specId: 'house-997', connectorInstanceId: 'csv-ridgeline', enabled: true },
   ];
   const rels = new RelationshipRepository(db);
   const rel = (over: Partial<TradingRelationship>): TradingRelationship => ({
@@ -99,12 +111,17 @@ async function main(): Promise<void> {
     delivered: false, needsReview: true, note: 'reused control number 000000123 with different content',
   });
 
-  // an in-progress onboarding session for Cascade (client-authoritative)
+  // onboarding sessions — seeded via the REAL service path so the board matches app behavior exactly
+  // (one card per configured document flow). Ridgeline is the partner login's scoped board (all 6 doc
+  // types); Cascade is a second, in-progress example for the client.
   const cert = new CertificationRepository(db);
-  const session = await cert.createSession({ tenantId: T, relationshipId: 'rel-cascade', formatAuthority: 'client', specVersion: '004010' });
-  await cert.setSessionStatus(T, session.id, 'in_certification');
-  await cert.addDoc({ tenantId: T, sessionId: session.id, docType: '850', role: 'anchor', direction: 'outbound', producedBy: 'client', validatedBy: 'partner', blocking: false });
-  await cert.addDoc({ tenantId: T, sessionId: session.id, docType: '855', role: 'response', direction: 'inbound', producedBy: 'partner', validatedBy: 'client', blocking: true });
+  const svc = new CertificationService(
+    cert, new RawArtifactRepository(db), rels, specs, maps,
+    new X12Service(), new IngestService(), new EmitService(), new ConformanceValidator(),
+  );
+  await svc.openSession(T, 'rel-ridgeline');
+  const cascade = await svc.openSession(T, 'rel-cascade');
+  await cert.setSessionStatus(T, cascade.session.id, 'in_certification');
 
   await db.destroy();
 
