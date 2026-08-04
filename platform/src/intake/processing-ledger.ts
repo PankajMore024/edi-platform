@@ -82,8 +82,9 @@ export abstract class ProcessingLedger {
   abstract list(query?: ProcessingQuery): Promise<ProcessingRecord[]>;
   /** Every event for one interchange identity, oldest first — the full lifecycle of that document. */
   abstract timeline(tenantId: string, dedupKey: string): Promise<ProcessingRecord[]>;
-  /** The review queue: OPEN events awaiting human attention (conflicts, rejects — not yet resolved). */
-  abstract needingReview(tenantId?: string): Promise<ProcessingRecord[]>;
+  /** The review queue: OPEN events awaiting human attention (conflicts, rejects — not yet resolved).
+   * Optionally scoped to one relationship (a partner's exceptions). */
+  abstract needingReview(tenantId?: string, relationshipId?: string): Promise<ProcessingRecord[]>;
   /** Stamp an operator resolution onto a review event. */
   abstract resolve(id: string, patch: ResolutionPatch): Promise<ProcessingRecord>;
 }
@@ -118,9 +119,9 @@ export class InMemoryProcessingLedger extends ProcessingLedger {
     return this.records.filter((r) => r.tenantId === tenantId && r.dedupKey === dedupKey).map((r) => ({ ...r }));
   }
 
-  async needingReview(tenantId?: string): Promise<ProcessingRecord[]> {
+  async needingReview(tenantId?: string, relationshipId?: string): Promise<ProcessingRecord[]> {
     // Open items only: flagged for review AND not yet resolved.
-    return (await this.list({ tenantId, needsReview: true })).filter((r) => !r.resolvedAt);
+    return (await this.list({ tenantId, relationshipId, needsReview: true })).filter((r) => !r.resolvedAt);
   }
 
   async resolve(id: string, patch: ResolutionPatch): Promise<ProcessingRecord> {

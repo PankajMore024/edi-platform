@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import { ProcessingRepository } from '../db/repositories/processing.repository';
 import { RelationshipRepository } from '../db/repositories/relationship.repository';
 import { QuarantineResolver } from '../control-plane/quarantine-resolver';
@@ -16,8 +16,8 @@ export class ReviewController {
   ) {}
 
   @Get()
-  queue(@Tenant() tenantId: string) {
-    return this.ledger.needingReview(tenantId);
+  queue(@Tenant() tenantId: string, @Query('relationshipId') relationshipId?: string) {
+    return this.ledger.needingReview(tenantId, relationshipId);
   }
 
   @Post(':id/dismiss')

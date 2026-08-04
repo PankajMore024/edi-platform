@@ -15,8 +15,18 @@ export class DocumentsController {
   ) {}
 
   @Get()
-  list(@Tenant() tenantId: string, @Query('docType') docType?: string, @Query('state') state?: string) {
-    return this.transactions.list(tenantId, { docType, state });
+  async list(
+    @Tenant() tenantId: string,
+    @Query('docType') docType?: string,
+    @Query('state') state?: string,
+    @Query('relationshipId') relationshipId?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const lim = limit != null ? Math.min(Math.max(parseInt(limit, 10) || 0, 1), 200) : undefined;
+    const off = offset != null ? Math.max(parseInt(offset, 10) || 0, 0) : 0;
+    const { items, total } = await this.transactions.list(tenantId, { docType, state, relationshipId, limit: lim, offset: off });
+    return { items, total, limit: lim ?? total, offset: off };
   }
 
   @Get(':id')

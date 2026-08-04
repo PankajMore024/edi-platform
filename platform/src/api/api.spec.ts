@@ -94,9 +94,13 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
       doc: { meta: { docType: '850', direction: 'inbound', partner: '', tenantId: 't1' }, poNumber: '4500', lineItems: [{ ids: [{ type: 'UP', value: 'A1' }], quantity: { value: 2 } }] } as any,
     });
     const res = await http().get('/api/documents').set('Authorization', t1).expect(200);
-    expect(res.body.map((d: any) => d.poNumber)).toContain('4500');
+    expect(res.body.items.map((d: any) => d.poNumber)).toContain('4500');
+    expect(res.body.total).toBe(1);
+    // partner-scoped + pagination: filter by relationshipId, and an unknown one is empty
+    expect((await http().get('/api/documents?relationshipId=rel-1&limit=10').set('Authorization', t1).expect(200)).body.total).toBe(1);
+    expect((await http().get('/api/documents?relationshipId=nope').set('Authorization', t1).expect(200)).body.items).toEqual([]);
     // t2's key must not see t1's documents
-    expect((await http().get('/api/documents').set('Authorization', t2).expect(200)).body).toEqual([]);
+    expect((await http().get('/api/documents').set('Authorization', t2).expect(200)).body.items).toEqual([]);
   });
 
   it('GET /api/review serves the queue; dismiss resolves it', async () => {
@@ -106,6 +110,9 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
       artifactId: 'a1', dedupKey: 'k1', occurrence: 1, delivered: false, needsReview: true,
     });
     expect((await http().get('/api/review').set('Authorization', t1).expect(200)).body.map((e: any) => e.id)).toContain(ev.id);
+    // partner-scoped queue: filtering by relationship keeps it; a different relationship excludes it
+    expect((await http().get('/api/review?relationshipId=rel-1').set('Authorization', t1).expect(200)).body.map((e: any) => e.id)).toContain(ev.id);
+    expect((await http().get('/api/review?relationshipId=other').set('Authorization', t1).expect(200)).body).toEqual([]);
     await http().post(`/api/review/${ev.id}/dismiss`).set('Authorization', t1).send({ resolvedBy: 'ops', note: 'waived' }).expect(201);
     expect((await http().get('/api/review').set('Authorization', t1).expect(200)).body.map((e: any) => e.id)).not.toContain(ev.id);
   });

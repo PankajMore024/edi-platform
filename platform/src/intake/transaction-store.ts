@@ -36,6 +36,9 @@ export interface StoredTransaction {
 }
 
 export interface TransactionSummary { id: string; docType: string; poNumber?: string; currentState: string; conformant: boolean; }
+/** A page of summaries + the unpaginated total (for the console's per-partner, paginated document lists). */
+export interface TransactionPage { items: TransactionSummary[]; total: number; }
+export type TransactionListFilter = { docType?: string; state?: string; relationshipId?: string; limit?: number; offset?: number };
 
 /**
  * Persists a processed transaction. The durable implementation shreds the canonical document into
@@ -45,12 +48,12 @@ export interface TransactionSummary { id: string; docType: string; poNumber?: st
 export abstract class TransactionStore {
   abstract save(p: SaveTransaction): Promise<string>;
   abstract get(tenantId: string, id: string): Promise<StoredTransaction | undefined>;
-  abstract list(tenantId: string, filter?: { docType?: string; state?: string }): Promise<TransactionSummary[]>;
+  abstract list(tenantId: string, filter?: TransactionListFilter): Promise<TransactionPage>;
 }
 
 @Injectable()
 export class InMemoryTransactionStore extends TransactionStore {
-  private readonly txns = new Map<string, StoredTransaction & { order: number }>();
+  private readonly txns = new Map<string, StoredTransaction & { order: number; relationshipId?: string }>();
   private seq = 0;
 
   async save(p: SaveTransaction): Promise<string> {
@@ -61,7 +64,7 @@ export class InMemoryTransactionStore extends TransactionStore {
       id, tenantId: p.tenantId, docType: p.docType, direction: p.direction,
       poNumber: d.poNumber ?? d.orders?.[0]?.poNumber, currentState: p.currentState, conformant: p.conformant,
       transactionControlNumber: p.transactionControlNumber, functionalGroupControlNumber: p.functionalGroupControlNumber,
-      canonical: p.doc, order: this.seq,
+      canonical: p.doc, order: this.seq, relationshipId: p.relationshipId,
     });
     return id;
   }
@@ -71,12 +74,17 @@ export class InMemoryTransactionStore extends TransactionStore {
     return t && t.tenantId === tenantId ? { ...t } : undefined;
   }
 
-  async list(tenantId: string, filter: { docType?: string; state?: string } = {}): Promise<TransactionSummary[]> {
-    return [...this.txns.values()]
+  async list(tenantId: string, filter: TransactionListFilter = {}): Promise<TransactionPage> {
+    const all = [...this.txns.values()]
       .filter((t) => t.tenantId === tenantId)
       .filter((t) => (filter.docType === undefined || t.docType === filter.docType))
       .filter((t) => (filter.state === undefined || t.currentState === filter.state))
-      .sort((a, b) => a.order - b.order)
-      .map((t) => ({ id: t.id, docType: t.docType, poNumber: t.poNumber, currentState: t.currentState, conformant: t.conformant }));
+      .filter((t) => (filter.relationshipId === undefined || t.relationshipId === filter.relationshipId))
+      .sort((a, b) => a.order - b.order);
+    const page = filter.limit != null ? all.slice(filter.offset ?? 0, (filter.offset ?? 0) + filter.limit) : all;
+    return {
+      total: all.length,
+      items: page.map((t) => ({ id: t.id, docType: t.docType, poNumber: t.poNumber, currentState: t.currentState, conformant: t.conformant })),
+    };
   }
 }

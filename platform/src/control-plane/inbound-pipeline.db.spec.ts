@@ -116,7 +116,7 @@ describe('InboundPipeline on durable repositories (node:sqlite)', () => {
     expect(canon.lineItems[0]).toMatchObject({ quantity: { value: 10, uom: 'EA' }, unitPrice: { amount: 18.5 } });
     expect(canon.lineItems[0].ids[0].value).toBe('012345678905');
     // queryable for dashboards without touching a blob
-    expect((await txns.list('t1', { state: 'DELIVERED' })).map((t) => t.poNumber)).toEqual(['4500']);
+    expect((await txns.list('t1', { state: 'DELIVERED' })).items.map((t) => t.poNumber)).toEqual(['4500']);
 
     // the write-side lifecycle rows are all persisted: interchange, 997, delivery, and a queued dispatch
     const count = async (t: string) => Number((await sql<{ n: number }>`select count(*) as n from ${sql.ref(t)}`.execute(db)).rows[0].n);

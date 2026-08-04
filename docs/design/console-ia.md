@@ -109,6 +109,16 @@ unaffected.
    views. Recommendation: land **Phase A** as a bounded feature effort, then resume hardening on the settled
    structure (so we don't harden views we're about to move).
 
+## Progress
+
+- **Backend enabler — DONE (2026-08-04).** `GET /documents` now returns a paginated envelope
+  `{ items, total, limit, offset }` and accepts `relationshipId` + `limit` (clamped 1–200) + `offset`;
+  `TransactionStore.list` (abstract + in-memory + DB repo) returns `{ items, total }` (stable
+  `created_at,id` order). `GET /review` accepts `relationshipId` (partner-scoped exceptions) — plumbed
+  through `needingReview(tenantId, relationshipId?)`. No schema change. Tests: repo pagination/scope +
+  e2e (documents envelope + relationship filter; review relationship filter). 248 green; console updated
+  to read `.items`. Next: the console restructure (partner workspace).
+
 ## Phase A scope (locked)
 
 The console's root becomes the **current client's workspace** (no Clients tab). Deliver:

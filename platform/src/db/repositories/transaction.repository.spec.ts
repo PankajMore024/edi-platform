@@ -63,7 +63,24 @@ describe('TransactionRepository (canonical ⇄ normalized rows)', () => {
   it('persists a REJECTED doc too (queryable for review), and lists by state', async () => {
     await repo.save(base({ doc: { meta: {}, poNumber: '4500', lineItems: [] } as any }));
     await repo.save(base({ currentState: 'REJECTED', conformant: false, reason: 'bad', doc: { meta: {}, poNumber: '4599', lineItems: [] } as any }));
-    expect((await repo.list('t1', { state: 'REJECTED' })).map((t) => t.poNumber)).toEqual(['4599']);
-    expect(await repo.list('t1')).toHaveLength(2);
+    expect((await repo.list('t1', { state: 'REJECTED' })).items.map((t) => t.poNumber)).toEqual(['4599']);
+    const all = await repo.list('t1');
+    expect(all.items).toHaveLength(2);
+    expect(all.total).toBe(2);
+  });
+
+  it('paginates and filters by relationship (partner-scoped, stable order)', async () => {
+    for (let i = 0; i < 5; i++) await repo.save(base({ relationshipId: 'rel-A', doc: { meta: {}, poNumber: `A${i}`, lineItems: [] } as any }));
+    await repo.save(base({ relationshipId: 'rel-B', doc: { meta: {}, poNumber: 'B0', lineItems: [] } as any }));
+
+    const relA = await repo.list('t1', { relationshipId: 'rel-A' });
+    expect(relA.total).toBe(5);
+    expect(relA.items.every((t) => t.poNumber?.startsWith('A'))).toBe(true);
+
+    const page1 = await repo.list('t1', { relationshipId: 'rel-A', limit: 2, offset: 0 });
+    const page2 = await repo.list('t1', { relationshipId: 'rel-A', limit: 2, offset: 2 });
+    expect(page1.items).toHaveLength(2);
+    expect(page1.total).toBe(5); // total ignores the page window
+    expect(page1.items.map((t) => t.id)).not.toEqual(page2.items.map((t) => t.id)); // distinct pages
   });
 });

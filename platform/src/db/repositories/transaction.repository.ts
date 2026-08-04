@@ -3,7 +3,7 @@ import { Kysely } from 'kysely';
 import { DB } from '../schema';
 import { CanonicalDocument } from '../../canonical/types/document.types';
 import { LineItem, Party, TypedValue } from '../../canonical/types/common.types';
-import { TransactionStore, SaveTransaction, StoredTransaction, TransactionSummary } from '../../intake/transaction-store';
+import { TransactionStore, SaveTransaction, StoredTransaction, TransactionSummary, TransactionPage, TransactionListFilter } from '../../intake/transaction-store';
 
 const str = (v: unknown): string | null => (v === undefined || v === null ? null : String(v));
 const num = (v: string | null): number | undefined => (v == null ? undefined : Number(v));
@@ -106,11 +106,21 @@ export class TransactionRepository extends TransactionStore {
   }
 
   /** Dashboard/ops query — header summaries by tenant, optionally filtered by doc type / state. */
-  async list(tenantId: string, filter: { docType?: string; state?: string } = {}): Promise<Array<{ id: string; docType: string; poNumber?: string; currentState: string; conformant: boolean }>> {
-    let q = this.db.selectFrom('transaction').select(['id', 'doc_type', 'po_number', 'current_state', 'conformant']).where('tenant_id', '=', tenantId);
-    if (filter.docType) q = q.where('doc_type', '=', filter.docType);
-    if (filter.state) q = q.where('current_state', '=', filter.state);
-    return (await q.orderBy('created_at').execute()).map((r) => ({ id: r.id, docType: r.doc_type, poNumber: r.po_number ?? undefined, currentState: r.current_state, conformant: r.conformant === 1 }));
+  async list(tenantId: string, filter: TransactionListFilter = {}): Promise<TransactionPage> {
+    // Build the filtered base once, then reuse it for both the count and the page (they must match).
+    let base = this.db.selectFrom('transaction').where('tenant_id', '=', tenantId);
+    if (filter.docType) base = base.where('doc_type', '=', filter.docType);
+    if (filter.state) base = base.where('current_state', '=', filter.state);
+    if (filter.relationshipId) base = base.where('relationship_id', '=', filter.relationshipId);
+
+    const totalRow = await base.select((eb) => eb.fn.countAll<number>().as('n')).executeTakeFirst();
+    const total = Number(totalRow?.n ?? 0);
+
+    let q = base.select(['id', 'doc_type', 'po_number', 'current_state', 'conformant']).orderBy('created_at').orderBy('id');
+    if (filter.limit != null) q = q.limit(filter.limit).offset(filter.offset ?? 0);
+
+    const items = (await q.execute()).map((r) => ({ id: r.id, docType: r.doc_type, poNumber: r.po_number ?? undefined, currentState: r.current_state, conformant: r.conformant === 1 }));
+    return { items, total };
   }
 
   private async reconstruct(tenantId: string, h: { id: string; doc_type: string; direction: string; po_number: string | null }): Promise<CanonicalDocument> {

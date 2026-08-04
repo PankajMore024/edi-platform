@@ -74,9 +74,10 @@ export class ProcessingRepository extends ProcessingLedger {
   }
 
   /** Open review queue: flagged for review and not yet resolved. */
-  async needingReview(tenantId?: string): Promise<ProcessingRecord[]> {
+  async needingReview(tenantId?: string, relationshipId?: string): Promise<ProcessingRecord[]> {
     let q = this.db.selectFrom('processing_event').selectAll().where('needs_review', '=', 1).where('resolved_at', 'is', null);
     if (tenantId !== undefined) q = q.where('tenant_id', '=', tenantId);
+    if (relationshipId !== undefined) q = q.where('relationship_id', '=', relationshipId);
     return (await q.orderBy('created_at').orderBy('id').execute()).map((r) => this.toRecord(r));
   }
 

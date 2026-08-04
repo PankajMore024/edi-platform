@@ -26,7 +26,7 @@ export function Documents() {
   const [open, setOpen] = useState<string | null>(null);
   if (loading) return <Loading />;
   if (error) return <ErrorBox msg={error} />;
-  const all = data ?? [];
+  const all = data?.items ?? [];
   const countOf = (dt: string) => all.filter((d) => d.docType === dt).length;
   const rows = active === 'all' ? all : all.filter((d) => d.docType === active);
 
