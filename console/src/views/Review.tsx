@@ -3,8 +3,8 @@ import { api, ReviewItem } from '../api';
 import { useAsync } from '../useAsync';
 import { Loading, ErrorBox } from '../ui';
 
-export function Review({ onChange }: { onChange?: () => void }) {
-  const { data, loading, error, reload } = useAsync(() => api.review());
+export function Review({ onChange, relationshipId }: { onChange?: () => void; relationshipId?: string }) {
+  const { data, loading, error, reload } = useAsync(() => api.review(relationshipId), [relationshipId]);
   const [busy, setBusy] = useState<string | null>(null);
 
   const act = async (id: string, kind: 'dismiss' | 'reprocess') => {

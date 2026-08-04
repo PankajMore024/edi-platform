@@ -238,3 +238,23 @@ section>.sec{margin-bottom:12px;}
 .ev{display:flex;gap:10px;align-items:baseline;padding:6px 14px;font-size:12.5px;}
 .ev .evseq{width:22px;flex:0 0 auto;text-align:right;color:var(--faint);font-variant-numeric:tabular-nums;font-size:11px;}
 .ev .evactor{font-weight:600;color:var(--muted);width:52px;flex:0 0 auto;} .ev .evverb{color:var(--ink);}
+
+/* ── hierarchical shell: breadcrumb + partner workspace ── */
+.top .crumbs{display:flex;align-items:center;gap:8px;font-size:13px;}
+.top .crumbs button{background:none;border:0;color:var(--accent-ink);font-weight:600;font-size:13px;padding:0;} .top .crumbs button:hover{text-decoration:underline;}
+.top .crumbs .sep{color:var(--faint);} .top .crumbs .cur{color:var(--ink);font-weight:600;}
+
+.partner .chev{margin-left:6px;color:var(--faint);font-size:18px;}
+.ws-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+.ws-head .logo{width:46px;height:46px;border-radius:11px;background:var(--surface-2);border:1px solid var(--border-strong);display:grid;place-items:center;font-weight:700;color:var(--muted);font-size:15px;}
+.ws-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap;}
+.ws-tabs button{display:inline-flex;align-items:center;gap:8px;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:9px 13px;font-size:13px;font-weight:600;margin-bottom:-1px;}
+.ws-tabs button:hover{color:var(--ink);} .ws-tabs button.on{color:var(--accent-ink);border-bottom-color:var(--accent);}
+.ws-tabs .badge{background:var(--bad);color:#fff;font-size:10.5px;min-width:16px;height:16px;border-radius:8px;display:grid;place-items:center;padding:0 5px;font-weight:700;}
+
+.conn{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;}
+.kv{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);}
+.kv .k{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;font-weight:600;} .kv .v{font-weight:600;margin-top:5px;}
+.pager{display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--border);font-size:12.5px;color:var(--muted);}
+.pager .spacer{flex:1;}
+.card .ch{display:flex;align-items:center;gap:11px;margin-bottom:2px;} .card .ci{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:16px;background:var(--surface-2);border:1px solid var(--border);}

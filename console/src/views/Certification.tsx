@@ -75,8 +75,8 @@ function CertCard({ doc, principal, onChange }: { doc: CertDoc; principal: Princ
   );
 }
 
-// ── the board for one session ──
-function Board({ sessionId, principal, onBack }: { sessionId: string; principal: Principal; onBack: () => void }) {
+// ── the board for one session ── (exported so the partner workspace can embed it, scoped)
+export function Board({ sessionId, principal, onBack }: { sessionId: string; principal: Principal; onBack?: () => void }) {
   const detail = useAsync(() => cert.session(sessionId), [sessionId]);
   const events = useAsync(() => cert.events(sessionId), [sessionId]);
   const messages = useAsync(() => cert.messages(sessionId), [sessionId]);
@@ -101,7 +101,7 @@ function Board({ sessionId, principal, onBack }: { sessionId: string; principal:
   return (
     <div className="view">
       <div className="board-top">
-        <button className="btn btn-ghost btn-sm" onClick={onBack}>‹ Sessions</button>
+        {onBack && <button className="btn btn-ghost btn-sm" onClick={onBack}>‹ Sessions</button>}
         <div style={{ flex: 1 }}>
           <div className="crumb">{session.relationshipId}</div>
           <h2 style={{ margin: '2px 0 0', fontSize: 18 }}>Certification · {session.formatAuthority}-authoritative</h2>

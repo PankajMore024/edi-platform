@@ -111,6 +111,16 @@ unaffected.
 
 ## Progress
 
+- **Frontend restructure — DONE (2026-08-04).** The console is now the hierarchical drill-down. `App.tsx`
+  splits by role: a **client** operator gets `ClientConsole` (contextual left rail + breadcrumb; landing =
+  **Partners** list → click opens a **Partner workspace**; **Resources** = Catalog + Library tabs); a
+  **partner** user keeps the scoped Certification console. `PartnerWorkspace` tabs: **Overview & Connection**
+  (envelope/roles/flows), **Documents** (`PartnerDocuments` — server-paginated, relationship-scoped,
+  doc-type pills), **Onboarding** (the certification `Board`, exported + embedded, scoped to this
+  relationship — opens/creates its session), **Exceptions** (`Review` scoped by `relationshipId`, with a
+  live badge), **Configuration** (co-located hub reusing PartnerForm / ImportWizard / TransportForm /
+  MapForm / SpecForm). The flat `Documents.tsx` was superseded by `PartnerDocuments` and removed. Build
+  clean (48 modules). Verified by build/tsc; live click-through pending a running backend.
 - **Backend enabler — DONE (2026-08-04).** `GET /documents` now returns a paginated envelope
   `{ items, total, limit, offset }` and accepts `relationshipId` + `limit` (clamped 1–200) + `offset`;
   `TransactionStore.list` (abstract + in-memory + DB repo) returns `{ items, total }` (stable
