@@ -23,7 +23,9 @@ import { UserRepository } from './repositories/user.repository';
 @Global()
 @Module({
   providers: [
-    { provide: DATABASE, useFactory: () => createDatabase({ url: process.env.DATABASE_URL }) },
+    // Postgres via DATABASE_URL (prod); else a file-backed sqlite via EDI_SQLITE_FILE (local dev, so the
+    // seed persists across restarts); else in-memory (tests pass their own sqliteFile).
+    { provide: DATABASE, useFactory: () => createDatabase({ url: process.env.DATABASE_URL, sqliteFile: process.env.EDI_SQLITE_FILE }) },
     { provide: RawArtifactRepository, useFactory: (db: Kysely<DB>) => new RawArtifactRepository(db), inject: [DATABASE] },
     { provide: DedupRepository, useFactory: (db: Kysely<DB>) => new DedupRepository(db), inject: [DATABASE] },
     { provide: ProcessingRepository, useFactory: (db: Kysely<DB>) => new ProcessingRepository(db), inject: [DATABASE] },

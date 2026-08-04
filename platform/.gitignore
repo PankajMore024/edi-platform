@@ -6,3 +6,7 @@
 .env.local
 .DS_Store
 *.tsbuildinfo
+
+# local dev seed database
+edi-dev.sqlite
+*.sqlite
