@@ -109,4 +109,36 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
     await http().post(`/api/review/${ev.id}/dismiss`).set('Authorization', t1).send({ resolvedBy: 'ops', note: 'waived' }).expect(201);
     expect((await http().get('/api/review').set('Authorization', t1).expect(200)).body.map((e: any) => e.id)).not.toContain(ev.id);
   });
+
+  it('certification: open session → drop a good 855 → gate opens → certify (auth + tenant-scoped)', async () => {
+    await http().post('/api/certification/sessions').expect(401); // guard applies here too
+
+    const rel: TradingRelationship = {
+      id: 'cert-rel', tenantId: 'ignored', partnerId: 'acme', formatAuthority: 'client', tenantRole: 'buyer',
+      version: '004010', mode: 'test',
+      envelope: { senderQualifier: 'ZZ', senderId: 'US', receiverQualifier: 'ZZ', receiverId: 'ACME', gsVersion: '004010' },
+      documents: [{ docType: '855', direction: 'inbound', mapId: '', enabled: true }],
+      active: true,
+    };
+    await http().put('/api/relationships/cert-rel').set('Authorization', t1).send(rel).expect(200);
+
+    const opened = await http().post('/api/certification/sessions').set('Authorization', t1).send({ relationshipId: 'cert-rel' }).expect(201);
+    const sessionId = opened.body.session.id;
+    const doc855 = opened.body.docs.find((d: any) => d.docType === '855');
+    expect(doc855.blocking).toBe(true);
+
+    // Blocked until the response passes.
+    await http().post(`/api/certification/sessions/${sessionId}/certify`).set('Authorization', t1).send({ certifiedBy: 'ops' }).expect(409);
+
+    const good855 = ['BAK*00*AC*4500*20260731~', 'PO1*1*10*EA*18.50**UP*012345678905~', 'ACK*IA*10*EA~', 'CTT*1~'].join('\n');
+    const dropped = await http().post(`/api/certification/docs/${doc855.id}/files`).set('Authorization', t1).send({ bytes: good855, uploadedBy: 'partner' }).expect(201);
+    expect(dropped.body.verdict).toBe('passed'); // conformance vs built-in house 855 spec
+
+    await http().post(`/api/certification/sessions/${sessionId}/certify`).set('Authorization', t1).send({ certifiedBy: 'ops' }).expect(201);
+    const detail = await http().get(`/api/certification/sessions/${sessionId}`).set('Authorization', t1).expect(200);
+    expect(detail.body.session.status).toBe('certified');
+
+    // t2 cannot see t1's session.
+    await http().get(`/api/certification/sessions/${sessionId}`).set('Authorization', t2).expect(404);
+  });
 });

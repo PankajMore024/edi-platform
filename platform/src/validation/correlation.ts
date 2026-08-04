@@ -103,6 +103,19 @@ export function correlateInvoiceToOrder(invoice: Invoice, order: Order): Correla
   return { correlated: issues.length === 0, issues };
 }
 
+/**
+ * Dispatch correlation by response doc type against the originating order (850). Returns undefined for
+ * doc types that don't correlate to an order (846 standalone; 997 correlates to a group, not an order).
+ */
+export function correlateToOrder(docType: string, response: unknown, order: Order): CorrelationResult | undefined {
+  switch (docType) {
+    case '855': return correlateAckToOrder(response as Order, order);
+    case '856': return correlateShipToOrder(response as Ship, order);
+    case '810': return correlateInvoiceToOrder(response as Invoice, order);
+    default: return undefined;
+  }
+}
+
 interface Sent997 { groupControlNumber: string; functionalId?: string; }
 interface Ack997Shape { ackGroupControlNumber?: string; ackFunctionalId?: string; ackCode?: string; }
 

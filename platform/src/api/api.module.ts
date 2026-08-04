@@ -4,6 +4,7 @@ import { ApiKeyGuard } from './api-key.guard';
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { TransportModule } from '../transport/transport.module';
 import { ControlPlaneModule } from '../control-plane/control-plane.module';
+import { CertificationModule } from '../certification/certification.module';
 import { CatalogController } from './catalog.controller';
 import { RelationshipsController } from './relationships.controller';
 import { ConnectorsController } from './connectors.controller';
@@ -19,7 +20,7 @@ import { ReviewController } from './review.controller';
  * QuarantineResolver from the control plane; the catalogs from the connector/transport registries.
  */
 @Module({
-  imports: [ConnectorsModule, TransportModule, ControlPlaneModule],
+  imports: [ConnectorsModule, TransportModule, ControlPlaneModule, CertificationModule],
   controllers: [
     CatalogController, RelationshipsController, ConnectorsController,
     SpecsController, PartnerMapsController, TransportsController,

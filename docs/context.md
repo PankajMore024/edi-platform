@@ -69,6 +69,22 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-04 — Phase 3: certification API [board backend, step 3]
+
+- **D91. Certification API — the board's backend flow, wired.** New `certification/` module composes the
+  durable repo (D90) with the inbound validation layer (D88/D89). `CertificationService.dropFile` is the
+  core: store bytes in raw_artifact → parse → conformance vs the doc's spec (tenant DocSpec override, else
+  built-in `HOUSE_SPECS` registry by docType) → if an inbound map + anchor reference are configured,
+  ingest + `correlateToOrder` → derive verdict (any error issue → `issues`) → `recordTestFile` durably
+  (issues `directedTo` the producer). `openSession` seeds a card per relationship document with
+  authority-derived roles (client-auth: partner produces responses / we validate; anchor=850,
+  standalone=846, blocking=responses). `setReference` stores the gold anchor 850 for correlation.
+  `CertificationController` exposes sessions/files/messages/events/waive/certify; the certify gate maps to
+  **409**. Registered via ApiModule→CertificationModule (global ApiKeyGuard applies). Tests: 6 service
+  integration (conformance pass, conformance defect, wrong-PO correlation fail, gate hold→certify, event
+  feed) + 1 HTTP e2e (401 guard, 409 gate, 201 certify, 404 tenant isolation). tsc clean; **236 tests
+  green** (was 229). Next: §5 step 4 (RBAC/partner login) or step 5 (board UI over these endpoints).
+
 ### 2026-08-04 — Phase 3: certification tables + repository [board backend, step 1]
 
 - **D90. Durable certification plane (schema + repository).** Built the 6 tables from

@@ -165,7 +165,12 @@ This is genuine engine work, not a UI stub — it is the long pole of this featu
    monotonic stamp for stable thread/feed ordering. Registered in DatabaseModule. `certification.types.ts`
    holds the domain types. 7 node:sqlite tests. **RBAC tables (§3) deferred to step 4.**
 2. Inbound ingest + conformance for 855/856/810/846/997 (+ correlation) — DONE (see §6).
-3. Certification API (create session, drop file → validate → verdict, message, certify gate).
+3. **Certification API — DONE.** `certification/` module: `CertificationService` orchestrates
+   store→conformance→ingest→correlate→verdict→record (composing D90 repo + D88/D89 validation);
+   `CertificationController` exposes sessions (open seeds a card per relationship doc with
+   authority-derived roles), file drop, messages, events, waive, and certify (gate → 409). Built-in
+   `HOUSE_SPECS` registry (config DocSpec overrides). Correlation runs when an inbound map + anchor
+   reference are configured. 6 service integration tests + 1 HTTP e2e.
 4. RBAC / partner login.
 5. The board UI over the API (the interactive mock is the target).
 6. AI at the edges: emit reference samples; explain a failed file + propose the fix.

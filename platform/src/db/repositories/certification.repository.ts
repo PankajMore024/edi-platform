@@ -91,6 +91,11 @@ export class CertificationRepository {
     await this.db.updateTable('certification_doc').set({ status, updated_at: this.now() }).where('tenant_id', '=', tenantId).where('id', '=', id).execute();
   }
 
+  /** Attach the authoritative side's reference sample artifact to a doc (e.g. the gold 850 on the anchor). */
+  async setDocReference(tenantId: string, id: string, referenceArtifactId: string): Promise<void> {
+    await this.db.updateTable('certification_doc').set({ reference_artifact_id: referenceArtifactId, updated_at: this.now() }).where('tenant_id', '=', tenantId).where('id', '=', id).execute();
+  }
+
   // ── test files + issues ──
   /**
    * Record a validated attempt: insert the test file + its issues, bump the doc's attempt count and set
