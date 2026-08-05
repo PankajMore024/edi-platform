@@ -231,9 +231,39 @@ A+B are the honest "prod-ready, tested, no creds" deliverable. C is prod code, m
 |---|---|
 | This spec | ✅ written |
 | A — SKU engine + split | ✅ built: `src/dropship/` (`SkuResolver` catalog→prefix→unmapped; `OrderRouter` split + translate + pack/uom); durable `product_catalog` + repo; **management API** (`/product-catalog`, client-only) + **console screen** (Resources → Product catalog: add/delete + CSV import); seeded demo bindings. Tests: 10 engine/repo + 1 e2e. **Applying the router on 850 emit + unmapped→exception lands in B** (needs the Shopify canonical source). |
-| B — translation + webhook | ⬜ |
+| B — translation + webhook | ✅ built: `src/connectors/shopify/` — order⇄canonical adapter, webhook HMAC verify+parse, `ShopifyIntake` (verify→canonical→split→held), sell-side create template. 10 tests over the §8 matrix. **Remaining → C:** the HTTP webhook receiver endpoint + shop-domain→tenant/connector routing + wiring `routed`/`unmapped` into the outbound emit & review queue. |
 | C — Admin API client | ⬜ (mock) |
 | D — live cert (dev store) | ⬜ (needs a free dev store) |
+
+---
+
+## 11. Implementation notes (as built)
+
+**A — dropship SKU engine** (`src/dropship/`): `product-catalog.types.ts`, `sku-resolver.ts`
+(catalog→prefix→unmapped), `order-router.ts` (split + translate + pack/uom). Durable
+`product_catalog` table + `ProductCatalogRepository` (`buildResolver` loads a tenant's catalog + prefixes
+into a `SkuResolver`). Management: `/product-catalog` API (client-only) + console **Resources → Product
+catalog** (add/delete + CSV import). Seeded demo bindings.
+
+**B — Shopify translation + webhook** (`src/connectors/shopify/`):
+- `shopify.types.ts` — the consumed subset of the Admin `Order` payload (money as decimal strings, `*_set`
+  currency).
+- `shopify-order.adapter.ts` — `shopifyOrderToCanonical(order, {poNumberFrom, currency})` (buy-side) +
+  `canonicalToShopifyOrder(order)` (sell-side template). Decimal money; `shop`/`presentment` currency
+  selection; address→party (role `ST`/`BT` — X12-code shortcut, see note in-file); SKU fallback → empty
+  `ids` when absent (so the router holds it); `isTestOrder`.
+- `shopify-webhook.ts` — `verifyShopifyHmac(rawBody, header, secret)` (constant-time, over the RAW body) +
+  `parseShopifyWebhook(headers, body)`.
+- `shopify-intake.ts` — `ShopifyIntake.ingest(rawBody, headers, secret, resolver, opts)`:
+  **verify HMAC → parse → skip `test` orders → map to canonical → split by vendor** → `{ idempotencyKey,
+  canonical, routed[], unmapped[], held }`. `held` (unmapped SKU) means do-not-emit. Pure/deterministic
+  given the resolver.
+
+**Tested (creds-free), §8 matrix covered:** header/party/line mapping; multi-currency; no-SKU → held;
+test-order skip; HMAC valid/wrong-secret/tampered/missing; webhook parse; multi-vendor split + prefix
+strip; sell-side create body. **Not yet (→ C, needs plumbing/creds):** the HTTP `POST /webhooks/shopify`
+receiver, shop-domain→tenant resolution, feeding `routed` into the 850 emit/dispatch, `unmapped`→review
+queue exception, and all live Admin API calls.
 
 Seeded `shopify-webstore` connector today is an **illustrative stub** (a hand-written connector-map) — not
 this connector. It'll be replaced as A/B land.
