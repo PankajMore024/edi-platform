@@ -4,11 +4,11 @@
 > config-driven, vendor-mapped product. Append new entries at the top of the
 > Decision Log; never rewrite history — supersede it.
 
-> **⏸ PARKED 2026-08-04 — hardening/review phase active (through D94).** Feature work is paused. This
-> log is a **frozen reference** during hardening: read it to validate changes; do not append feature
-> decisions. Review/testing narrative and findings live in **`docs/hardening/`** (README + findings-log),
-> kept separate so hardening does not pollute this log. Resume feature entries here only when the
-> hardening phase closes.
+> **▶ LIVE — feature development resumed 2026-08-05.** A hardening/review phase was opened 2026-08-04 (see
+> `docs/hardening/`) but we pivoted back to real app work (the console IA restructure) at the user's
+> direction, so this log is **live again** — document real changes here as decisions. The hardening
+> review remains a **future pass** (its findings-log stays the place for review-only defect narrative);
+> it is not the current mode. Append new entries at the top.
 
 ## Goal
 
@@ -74,6 +74,30 @@ to commercialize. Do not push this repo (with real partner files) anywhere new
 until settled.
 
 ## Decision Log
+
+### 2026-08-05 — Phase 3: industrial console (IA restructure) + runnable dev env [console]
+
+- **D95. The console became a hierarchical Client → Partner admin console, and the app is now runnable
+  end-to-end.** Full design in `docs/design/console-ia.md`; run guide in `docs/dev-run.md`. Decided
+  **Phase A only** — per-tenant, **no cross-tenant `platform_admin` "Clients" layer yet** (deferred to
+  Phase B when there is >1 client tenant). What shipped: **(a) IA restructure** — `App.tsx` splits by
+  role; a client operator gets `ClientConsole` (contextual left rail + breadcrumb; Partners landing →
+  **PartnerWorkspace** with tabs Overview&Connection / Documents / Onboarding / Exceptions / Configuration;
+  Resources = Catalog+Library); a partner keeps the RBAC-scoped Certification console. Queues + docs are
+  now **per-partner**, not global (the user's core ask). **(b) Backend enablers** (additive, no schema
+  change — `relationship_id` already on `transaction`/`processing_event`): `GET /documents` returns a
+  paginated envelope `{items,total,limit,offset}` + accepts `relationshipId`; `GET /review` accepts
+  `relationshipId`; `TransactionStore.list` → `{items,total}` with stable order. **(c) Dev bootstrap** —
+  backend reads `EDI_SQLITE_FILE` for a persistent local sqlite (falls back to `:memory:` for tests);
+  `npm run seed` / `npm run start:local`; `src/seed.ts` seeds a demo tenant, a client_admin + scoped
+  partner login, an API key, 3 partners (Ridgeline live/full 6 doc-flows, Summit, Cascade onboarding),
+  specs/maps/**4 connector instances** (csv/shopify/generic-rest/quickbooks) + a transport, ~24
+  documents, an exception, and onboarding sessions seeded via the real `openSession` path. Verified
+  live over HTTP. Tests 248 green; console build clean (48 modules). Note: certification board renders
+  one card per configured document flow (so a relationship's flows must include a doc type for it to
+  appear — surfaced via the seed initially omitting 846/997, now fixed). **Process:** these were real
+  app changes made after a brief hardening-phase setup; per user direction the hardening review is
+  deferred and this log is the live decision record again.
 
 ### 2026-08-04 — Phase 3: AI at the edges [certification step 6 — feature COMPLETE]
 

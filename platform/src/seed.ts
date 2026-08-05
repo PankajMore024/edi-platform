@@ -60,10 +60,27 @@ async function main(): Promise<void> {
   await maps.save(T, 'ridgeline-856-in', SAMPLE_856_MAP); await maps.save(T, 'ridgeline-810-in', SAMPLE_810_MAP);
   await maps.save(T, 'ridgeline-846-in', SAMPLE_846_MAP); await maps.save(T, 'ridgeline-997-in', SAMPLE_997_MAP);
 
-  await new ConnectorInstanceRepository(db).save({
+  const connectors = new ConnectorInstanceRepository(db);
+  await connectors.save({
     id: 'csv-ridgeline', tenantId: T, connectorType: 'csv', settings: { hasHeader: true },
     connectorMap: { connector: 'csv', docType: '850', direction: 'outbound', header: [{ to: 'poNumber', from: 'PO' }] },
     docTypes: ['850'], trigger: 'file-drop',
+  });
+  // A few more instances so the connector picker in a document flow shows real variety.
+  await connectors.save({
+    id: 'shopify-webstore', tenantId: T, connectorType: 'shopify', settings: { shop: 'demo.myshopify.com' },
+    connectorMap: { connector: 'shopify', docType: '850', direction: 'inbound', header: [{ to: 'poNumber', from: 'name' }], lineTo: 'lines', lineOver: 'line_items', lineFields: [{ to: 'sku', from: 'sku' }, { to: 'quantity.value', from: 'quantity', decimal: 0 }] },
+    docTypes: ['850'], trigger: 'webhook',
+  });
+  await connectors.save({
+    id: 'rest-oms', tenantId: T, connectorType: 'generic-rest', settings: { baseUrl: 'https://oms.demo.co/api' },
+    connectorMap: { connector: 'generic-rest', docType: '855', direction: 'outbound', header: [{ to: 'poNumber', from: 'orderId' }] },
+    docTypes: ['855', '856'], trigger: 'poll',
+  });
+  await connectors.save({
+    id: 'quickbooks-ledger', tenantId: T, connectorType: 'quickbooks', settings: { realmId: 'demo-realm' },
+    connectorMap: { connector: 'quickbooks', docType: '810', direction: 'inbound', header: [{ to: 'invoiceNumber', from: 'DocNumber' }] },
+    docTypes: ['810'], trigger: 'manual',
   });
   await new TransportInstanceRepository(db).save({
     id: 'sftp-ridgeline', tenantId: T, transportType: 'sftp',
