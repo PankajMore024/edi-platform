@@ -4,6 +4,7 @@ import { useAsync } from '../useAsync';
 import { Loading, ErrorBox } from '../ui';
 import { ImportWizard } from './ImportWizard';
 import { TransportForm } from './TransportForm';
+import { ConnectorForm } from './ConnectorForm';
 
 const ICON: Record<string, string> = { csv: '🧾', xlsx: '📊', database: '🗄️', shopify: '🛒', amazon: '📦', quickbooks: '💵', 'generic-rest': '🔌', sftp: '🔐', webhook: '🪝' };
 
@@ -27,6 +28,13 @@ export function Catalog() {
   const transports = useAsync(() => api.transports());
   const [wizard, setWizard] = useState(false);
   const [tform, setTform] = useState<{ mode: 'new' } | { mode: 'edit'; tp: TransportInstance } | null>(null);
+  const [cform, setCform] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const removeConnector = async (id: string) => {
+    if (!confirm(`Delete connector "${id}"? This can't be undone.`)) return;
+    setBusy(id);
+    try { await api.deleteConnector(id); instances.reload(); } catch (e) { alert((e as Error).message); } finally { setBusy(null); }
+  };
   if (loading) return <Loading />;
   if (error) return <ErrorBox msg={error} />;
   const configured = instances.data ?? [];
@@ -41,9 +49,15 @@ export function Catalog() {
         {configured.length === 0
           ? <div className="empty">No connectors configured yet. <br />Import a client CSV or API payload to auto-map it to canonical fields.</div>
           : <table>
-              <thead><tr><th>Connector id</th><th>Type</th><th>Doc types</th><th>Trigger</th></tr></thead>
+              <thead><tr><th>Connector id</th><th>Type</th><th>Doc types</th><th>Trigger</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead>
               <tbody>{configured.map((c: ConnectorInstanceRef) => (
-                <tr key={c.id}><td className="mono">{c.id}</td><td><span className="tag">{c.connectorType}</span></td><td className="mono sub">{c.docTypes.join(', ')}</td><td className="sub">{c.trigger}</td></tr>
+                <tr key={c.id}><td className="mono">{c.id}</td><td><span className="tag">{c.connectorType}</span></td><td className="mono sub">{c.docTypes.join(', ')}</td><td className="sub">{c.trigger}</td>
+                  <td className="rowacts">
+                    <button className="iconbtn" title="View" onClick={() => setCform({ id: c.id, mode: 'view' })}>◔</button>
+                    <button className="iconbtn" title="Edit" onClick={() => setCform({ id: c.id, mode: 'edit' })}>✎</button>
+                    <button className="iconbtn danger" title="Delete" disabled={busy === c.id} onClick={() => removeConnector(c.id)}>🗑</button>
+                  </td>
+                </tr>
               ))}</tbody>
             </table>}
       </div>
@@ -72,6 +86,7 @@ export function Catalog() {
       {wizard && <ImportWizard onClose={() => setWizard(false)} onSaved={() => { setWizard(false); instances.reload(); }} />}
       {tform?.mode === 'new' && <TransportForm onClose={() => setTform(null)} onSaved={() => { setTform(null); transports.reload(); }} />}
       {tform?.mode === 'edit' && <TransportForm existing={tform.tp} onClose={() => setTform(null)} onSaved={() => { setTform(null); transports.reload(); }} />}
+      {cform && <ConnectorForm id={cform.id} mode={cform.mode} onClose={() => setCform(null)} onSaved={() => { setCform(null); instances.reload(); }} />}
     </div>
   );
 }

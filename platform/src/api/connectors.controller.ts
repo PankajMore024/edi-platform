@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Put, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Post, Put, BadRequestException } from '@nestjs/common';
 import { ConnectorInstanceRepository } from '../db/repositories/connector-instance.repository';
 import { ConnectorInstance } from '../connectors/connector.types';
 import { profileSample, SampleProfile } from '../connectors/sample-profiler';
@@ -44,5 +44,12 @@ export class ConnectorsController {
     const inst: ConnectorInstance = { ...body, id, tenantId };
     await this.repo.save(inst);
     return inst;
+  }
+
+  @Delete(':id')
+  async remove(@Tenant() tenantId: string, @Param('id') id: string): Promise<{ deleted: boolean }> {
+    const deleted = await this.repo.delete(tenantId, id);
+    if (!deleted) throw new NotFoundException(`connector instance ${id} not found`);
+    return { deleted };
   }
 }

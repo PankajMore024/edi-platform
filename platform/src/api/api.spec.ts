@@ -69,6 +69,12 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
     await http().put('/api/connectors/ci-1').set('Authorization', t1).send(inst).expect(200);
     const got = await http().get('/api/connectors/ci-1').set('Authorization', t1).expect(200);
     expect(got.body).toMatchObject({ id: 'ci-1', tenantId: 't1', connectorType: 'csv', docTypes: ['850'] });
+
+    // delete (CRUD): removes it; a second delete 404s; t2 cannot delete t1's connector
+    await http().delete('/api/connectors/ci-1').set('Authorization', t2).expect(404);
+    await http().delete('/api/connectors/ci-1').set('Authorization', t1).expect(200);
+    await http().get('/api/connectors/ci-1').set('Authorization', t1).expect(404);
+    await http().delete('/api/connectors/ci-1').set('Authorization', t1).expect(404);
   });
 
   it('provisions specs / partner-maps / transports (the rest of the config graph)', async () => {

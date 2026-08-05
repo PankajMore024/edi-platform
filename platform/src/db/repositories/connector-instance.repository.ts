@@ -45,6 +45,15 @@ export class ConnectorInstanceRepository {
     };
   }
 
+  /** Remove an instance and its connector map. Returns false if it wasn't there (or wrong tenant). */
+  async delete(tenantId: string, id: string): Promise<boolean> {
+    return this.db.transaction().execute(async (trx) => {
+      const r = await trx.deleteFrom('connector_instance').where('tenant_id', '=', tenantId).where('id', '=', id).executeTakeFirst();
+      await trx.deleteFrom('connector_map').where('tenant_id', '=', tenantId).where('connector_instance_id', '=', id).execute();
+      return Number(r.numDeletedRows ?? 0) > 0;
+    });
+  }
+
   async listByTenant(tenantId: string): Promise<Array<{ id: string; connectorType: string; trigger: string; docTypes: string[] }>> {
     const rows = await this.db.selectFrom('connector_instance').select(['id', 'connector_type', 'trigger']).where('tenant_id', '=', tenantId).execute();
     const out = [];

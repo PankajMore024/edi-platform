@@ -75,6 +75,28 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-05 — Phase 3: connector CRUD + honest connector/transport status [console]
+
+- **D96. Configured connectors are now fully CRUD-able; recorded the real (stub) status of platform
+  connectors.** **CRUD:** the Catalog "Configured connectors" list gets per-row **view / edit / delete**
+  icons. Backend: `DELETE /connectors/:id` (+ `ConnectorInstanceRepository.delete`, tenant-scoped,
+  removes instance + its connector_map); GET/PUT already existed. Console: `ConnectorForm` drawer
+  (view = read-only; edit persists via PUT) that edits trigger, settings (JSON), and the connector map's
+  header/line **field bindings** (to/from/decimal tables); `api.connector(id)`/`deleteConnector(id)`.
+  e2e covers delete + 404 + tenant isolation. 248 tests green; console build clean (49 modules). Create
+  remains the Import-sample wizard (sample → inferred map).
+- **Honest architecture note (Shopify / the "inference layer"):** two orthogonal axes (per
+  `docs/design/connector-layer.md`): a **transport** moves bytes (SFTP file-drop, webhook/HTTP push, or
+  an API pull), a **connector** maps those bytes ⇄ canonical via the `ConnectorMap` + ObjectMapper. The
+  **inference layer** (sample-profiler, D78) takes a real sample payload → infers field→canonical
+  bindings → a ConnectorMap the operator reviews. **Current state is a STUB for real platforms:** the
+  seeded `shopify-webstore` (and shopify/amazon/quickbooks descriptors) are illustrative
+  connector-maps only — there is **no live Shopify OAuth/webhook/Admin-API adapter** and the sftp/webhook
+  transports still throw `TransportNotConfiguredError` (credential-gated). A real Shopify integration =
+  a webhook transport (order/create push) and/or an Admin REST/GraphQL pull adapter + OAuth (vault) +
+  a connector-map inferred from a real Shopify order JSON. Deferred, credential-gated; tracked here so
+  it isn't mistaken for working.
+
 ### 2026-08-05 — Phase 3: industrial console (IA restructure) + runnable dev env [console]
 
 - **D95. The console became a hierarchical Client → Partner admin console, and the app is now runnable
