@@ -476,6 +476,17 @@ export async function createSchema(db: Kysely<DB>): Promise<void> {
     .execute();
   await db.schema.createIndex('product_catalog_sku').ifNotExists().on('product_catalog').columns(['tenant_id', 'sellable_sku']).execute();
   await db.schema.createIndex('product_catalog_binding').ifNotExists().on('product_catalog').columns(['tenant_id', 'sellable_sku', 'relationship_id']).unique().execute();
+
+  await db.schema.createTable('shopify_registration').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('shop_domain', 'text', (c) => c.notNull())
+    .addColumn('secret', 'text', (c) => c.notNull())
+    .addColumn('connector_instance_id', 'text')
+    .addColumn('prefixes', 'text', (c) => c.notNull())
+    .addColumn('created_at', 'text', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('shopify_registration_shop').ifNotExists().on('shopify_registration').columns(['shop_domain']).unique().execute();
 }
 
 /** Every table name, for verification/introspection. */
@@ -490,5 +501,5 @@ export const ALL_TABLES = [
   'certification_session', 'certification_doc', 'certification_test_file', 'certification_issue',
   'certification_message', 'certification_event',
   'console_user', 'user_relationship_scope', 'user_session',
-  'product_catalog',
+  'product_catalog', 'shopify_registration',
 ] as const;

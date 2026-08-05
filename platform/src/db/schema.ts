@@ -198,6 +198,14 @@ export interface ProductCatalogTable {
   pack_size: string | null; uom: string | null; priority: number | null; active: Bool;
 }
 
+// Shopify webhook registration: maps an incoming shop domain → the tenant, the HMAC secret to verify with,
+// and the per-vendor SKU prefixes for routing. Webhooks are unauthenticated by API key (Shopify sends the
+// shop + HMAC), so this is how a public webhook resolves its tenant. `secret` is dev-plain; prod → vault.
+export interface ShopifyRegistrationTable {
+  id: string; tenant_id: string; shop_domain: string; secret: string;
+  connector_instance_id: string | null; prefixes: Json; created_at: Ts;
+}
+
 /** The Kysely database. Pass as `Kysely<DB>`. */
 export interface DB {
   tenant: TenantTable;
@@ -243,4 +251,5 @@ export interface DB {
   user_relationship_scope: UserRelationshipScopeTable;
   user_session: UserSessionTable;
   product_catalog: ProductCatalogTable;
+  shopify_registration: ShopifyRegistrationTable;
 }

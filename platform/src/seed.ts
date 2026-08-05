@@ -18,6 +18,7 @@ import { TransactionRepository } from './db/repositories/transaction.repository'
 import { ProcessingRepository } from './db/repositories/processing.repository';
 import { CertificationRepository } from './db/repositories/certification.repository';
 import { ProductCatalogRepository } from './db/repositories/product-catalog.repository';
+import { ShopifyRegistrationRepository } from './db/repositories/shopify-registration.repository';
 import { RawArtifactRepository } from './db/repositories/raw-artifact.repository';
 import { CertificationService } from './certification/certification.service';
 import { X12Service } from './x12/x12.service';
@@ -130,6 +131,12 @@ async function main(): Promise<void> {
     { tenantId: T, sellableSku: 'GADGET-SM', vendorId: 'rel-summit', vendorSku: 'SMT-9', uom: 'EA' },
     { tenantId: T, sellableSku: 'SPROCKET', vendorId: 'rel-ridgeline', vendorSku: 'RDG-88', packSize: 6, uom: 'CA' },
   ]);
+
+  // Shopify webhook registration (maps the shop → tenant + HMAC secret + routing prefixes)
+  await new ShopifyRegistrationRepository(db).upsert({
+    tenantId: T, shopDomain: 'demo.myshopify.com', secret: 'whsec_demo', connectorInstanceId: 'shopify-webstore',
+    prefixes: [{ vendorId: 'rel-ridgeline', prefix: 'RDG-' }, { vendorId: 'rel-summit', prefix: 'SMT-' }],
+  });
 
   // an exception (held for review) on Ridgeline
   await new ProcessingRepository(db).record({

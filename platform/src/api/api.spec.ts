@@ -1,10 +1,12 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { createHmac } from 'crypto';
 import request from 'supertest';
 import { AppModule } from '../app.module';
 import { TransactionRepository } from '../db/repositories/transaction.repository';
 import { ProcessingRepository } from '../db/repositories/processing.repository';
 import { ApiKeyRepository } from '../db/repositories/api-key.repository';
+import { ShopifyRegistrationRepository } from '../db/repositories/shopify-registration.repository';
 import { TradingRelationship } from '../control-plane/config.types';
 
 describe('Provisioning API (e2e, node:sqlite)', () => {
@@ -15,7 +17,7 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ rawBody: true }); // Shopify HMAC needs the raw body
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
@@ -153,6 +155,43 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
 
     // t2 cannot see t1's session.
     await http().get(`/api/certification/sessions/${sessionId}`).set('Authorization', t2).expect(404);
+  });
+
+  it('Shopify webhook: verifies HMAC → splits by vendor → persists 850s (idempotent); holds unmapped; 401 on bad sig', async () => {
+    const SECRET = 'whsec_demo';
+    await app.get(ShopifyRegistrationRepository).upsert({
+      tenantId: 't1', shopDomain: 'test.myshopify.com', secret: SECRET,
+      prefixes: [{ vendorId: 'wh-vendor-a', prefix: 'A-' }, { vendorId: 'wh-vendor-b', prefix: 'B-' }],
+    });
+    const order = (lines: any[]) => JSON.stringify({ id: 555, name: '#555', currency: 'USD', created_at: '2026-08-05T10:00:00Z', line_items: lines, shipping_address: { name: 'X', city: 'NYC', country_code: 'US' } });
+    const post = (body: string, wid: string, secret = SECRET) =>
+      http().post('/api/webhooks/shopify').set('Content-Type', 'application/json')
+        .set('X-Shopify-Shop-Domain', 'test.myshopify.com').set('X-Shopify-Webhook-Id', wid)
+        .set('X-Shopify-Hmac-Sha256', createHmac('sha256', secret).update(body).digest('base64')).send(body);
+
+    // clean split → 2 vendor 850s persisted
+    const good = order([{ id: 1, sku: 'A-1', quantity: 2, price: '5.00' }, { id: 2, sku: 'B-2', quantity: 1, price: '3.00' }]);
+    const res = await post(good, 'wh-1').expect(200);
+    expect(res.body).toMatchObject({ status: 'processed', routed: 2, held: false });
+    expect((await http().get('/api/documents?relationshipId=wh-vendor-a').set('Authorization', t1).expect(200)).body.total).toBe(1);
+
+    // idempotent: same webhook id → no re-persist
+    await post(good, 'wh-1').expect(200).then((r) => expect(r.body.status).toBe('duplicate'));
+    expect((await http().get('/api/documents?relationshipId=wh-vendor-a').set('Authorization', t1).expect(200)).body.total).toBe(1);
+
+    // bad signature → 401
+    await post(good, 'wh-x', 'wrong-secret').expect(401);
+
+    // held: an unmapped SKU → not routed, recorded as a review exception
+    const bad = order([{ id: 1, sku: 'A-1', quantity: 1, price: '5.00' }, { id: 2, sku: 'ZZ-9', quantity: 1, price: '1.00' }]);
+    await post(bad, 'wh-2').expect(200).then((r) => expect(r.body).toMatchObject({ status: 'processed', held: true, unmapped: ['ZZ-9'] }));
+    expect((await http().get('/api/review?relationshipId=wh-vendor-a').set('Authorization', t1).expect(200)).body.some((e: any) => e.needsReview)).toBe(true);
+
+    // a Shopify test order is skipped
+    await post(JSON.stringify({ id: 9, test: true, currency: 'USD', line_items: [] }), 'wh-3').expect(200).then((r) => expect(r.body.status).toBe('skipped-test'));
+
+    // unknown shop → 404
+    await http().post('/api/webhooks/shopify').set('X-Shopify-Shop-Domain', 'nope.myshopify.com').set('X-Shopify-Hmac-Sha256', 'x').send('{}').expect(404);
   });
 
   it('product catalog: client CRUD (upsert/bulk/list/delete); partners are forbidden', async () => {

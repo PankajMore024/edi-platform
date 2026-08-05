@@ -232,8 +232,18 @@ A+B are the honest "prod-ready, tested, no creds" deliverable. C is prod code, m
 | This spec | ✅ written |
 | A — SKU engine + split | ✅ built: `src/dropship/` (`SkuResolver` catalog→prefix→unmapped; `OrderRouter` split + translate + pack/uom); durable `product_catalog` + repo; **management API** (`/product-catalog`, client-only) + **console screen** (Resources → Product catalog: add/delete + CSV import); seeded demo bindings. Tests: 10 engine/repo + 1 e2e. **Applying the router on 850 emit + unmapped→exception lands in B** (needs the Shopify canonical source). |
 | B — translation + webhook | ✅ built: `src/connectors/shopify/` — order⇄canonical adapter, webhook HMAC verify+parse, `ShopifyIntake` (verify→canonical→split→held), sell-side create template. 10 tests over the §8 matrix. **Remaining → C:** the HTTP webhook receiver endpoint + shop-domain→tenant/connector routing + wiring `routed`/`unmapped` into the outbound emit & review queue. |
-| C — Admin API client | ⬜ (mock) |
+| C — webhook receiver + wiring | ◐ built: public `POST /api/webhooks/shopify` (raw-body HMAC), `shopify_registration` (shop→tenant/secret/prefixes) + repo, `ShopifyWebhookService` (resolve→verify→intake→**persist**: routed→outbound 850 transactions per vendor; held→review exception; idempotent on webhook id). 1 e2e (split+persist+idempotent+held+bad-sig+test-skip+unknown-shop). Seeded registration for `demo.myshopify.com`. **Remaining → C':** the Admin API *client* (create-order/fulfillment/inventory, mock-tested) + wiring routed 850s into the X12 envelope/dispatch to the vendor. |
 | D — live cert (dev store) | ⬜ (needs a free dev store) |
+
+### C — webhook flow (as built)
+
+`POST /api/webhooks/shopify` (public, `@Public()`; app created with `rawBody: true` so HMAC is over the
+raw bytes). `ShopifyWebhookService.process(rawBody, headers)`: shop-domain → `ShopifyRegistration`
+(tenant, secret, prefixes) → `ShopifyIntake` (verify HMAC → parse → skip test → canonical → split) →
+persist. Clean split ⇒ one **outbound 850 transaction per vendor** (`ROUTED`, visible in that partner's
+Documents). Held (unmapped SKU) ⇒ **no routing**, a `needsReview` processing event (review queue) instead.
+Idempotent: a repeat `X-Shopify-Webhook-Id` is a `duplicate` no-op. Bad HMAC ⇒ 401; unknown shop ⇒ 404;
+`test` order ⇒ `skipped-test`. Live curl example in the C demo (see chat / dev-run).
 
 ---
 

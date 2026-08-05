@@ -15,6 +15,8 @@ import { TransportsController } from './transports.controller';
 import { DocumentsController } from './documents.controller';
 import { ReviewController } from './review.controller';
 import { ProductCatalogController } from './product-catalog.controller';
+import { ShopifyWebhookController } from './shopify-webhook.controller';
+import { ShopifyWebhookService } from '../connectors/shopify/shopify-webhook.service';
 
 /**
  * HTTP API — the console/provisioning backend over the control plane. Read models (catalog, documents,
@@ -26,8 +28,8 @@ import { ProductCatalogController } from './product-catalog.controller';
   controllers: [
     AuthController, CatalogController, RelationshipsController, ConnectorsController,
     SpecsController, PartnerMapsController, TransportsController,
-    DocumentsController, ReviewController, ProductCatalogController,
+    DocumentsController, ReviewController, ProductCatalogController, ShopifyWebhookController,
   ],
-  providers: [{ provide: APP_GUARD, useClass: PrincipalGuard }],
+  providers: [{ provide: APP_GUARD, useClass: PrincipalGuard }, ShopifyWebhookService],
 })
 export class ApiModule {}

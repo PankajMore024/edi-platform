@@ -7,7 +7,7 @@ import { AppModule } from './app.module';
  * with clean boundaries so it can be extracted to a microservice later without a rewrite.
  */
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true }); // rawBody: Shopify HMAC is over raw bytes
   app.enableCors(); // the console is served from a different origin in dev
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

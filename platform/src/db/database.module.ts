@@ -16,6 +16,7 @@ import { ApiKeyRepository } from './repositories/api-key.repository';
 import { CertificationRepository } from './repositories/certification.repository';
 import { UserRepository } from './repositories/user.repository';
 import { ProductCatalogRepository } from './repositories/product-catalog.repository';
+import { ShopifyRegistrationRepository } from './repositories/shopify-registration.repository';
 
 /**
  * Provides the shared Kysely connection + durable repositories, and bootstraps the schema on startup.
@@ -43,13 +44,14 @@ import { ProductCatalogRepository } from './repositories/product-catalog.reposit
     { provide: CertificationRepository, useFactory: (db: Kysely<DB>) => new CertificationRepository(db), inject: [DATABASE] },
     { provide: UserRepository, useFactory: (db: Kysely<DB>) => new UserRepository(db), inject: [DATABASE] },
     { provide: ProductCatalogRepository, useFactory: (db: Kysely<DB>) => new ProductCatalogRepository(db), inject: [DATABASE] },
+    { provide: ShopifyRegistrationRepository, useFactory: (db: Kysely<DB>) => new ShopifyRegistrationRepository(db), inject: [DATABASE] },
   ],
   exports: [
     DATABASE, RawArtifactRepository, DedupRepository, ProcessingRepository,
     ControlNumberRepository, RelationshipRepository, DocSpecRepository, PartnerMapRepository,
     ConnectorMapRepository, TransportInstanceRepository, TransactionRepository, DbLifecycleSink,
     ConnectorInstanceRepository, ApiKeyRepository, CertificationRepository, UserRepository,
-    ProductCatalogRepository,
+    ProductCatalogRepository, ShopifyRegistrationRepository,
   ],
 })
 export class DatabaseModule implements OnModuleInit, OnModuleDestroy {
