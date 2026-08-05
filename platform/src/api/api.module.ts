@@ -14,6 +14,7 @@ import { PartnerMapsController } from './partner-maps.controller';
 import { TransportsController } from './transports.controller';
 import { DocumentsController } from './documents.controller';
 import { ReviewController } from './review.controller';
+import { ProductCatalogController } from './product-catalog.controller';
 
 /**
  * HTTP API — the console/provisioning backend over the control plane. Read models (catalog, documents,
@@ -25,7 +26,7 @@ import { ReviewController } from './review.controller';
   controllers: [
     AuthController, CatalogController, RelationshipsController, ConnectorsController,
     SpecsController, PartnerMapsController, TransportsController,
-    DocumentsController, ReviewController,
+    DocumentsController, ReviewController, ProductCatalogController,
   ],
   providers: [{ provide: APP_GUARD, useClass: PrincipalGuard }],
 })

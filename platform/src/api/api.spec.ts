@@ -155,6 +155,24 @@ describe('Provisioning API (e2e, node:sqlite)', () => {
     await http().get(`/api/certification/sessions/${sessionId}`).set('Authorization', t2).expect(404);
   });
 
+  it('product catalog: client CRUD (upsert/bulk/list/delete); partners are forbidden', async () => {
+    await http().post('/api/product-catalog').set('Authorization', t1).send({ sellableSku: 'WIDGET', vendorId: 'ridgeline', vendorSku: 'RDG-1', packSize: 12, uom: 'CA' }).expect(201);
+    await http().post('/api/product-catalog/bulk').set('Authorization', t1).send({ entries: [
+      { sellableSku: 'GADGET', vendorId: 'summit', vendorSku: 'SMT-9' },
+      { sellableSku: '', vendorId: 'x', vendorSku: 'y' }, // invalid → skipped
+    ] }).expect(201).then((r) => { expect(r.body).toEqual({ upserted: 1, skipped: 1 }); });
+    const list = (await http().get('/api/product-catalog').set('Authorization', t1).expect(200)).body;
+    expect(list.map((e: any) => e.sellableSku).sort()).toEqual(['GADGET', 'WIDGET']);
+    await http().delete('/api/product-catalog?sellableSku=WIDGET&vendorId=ridgeline').set('Authorization', t1).expect(200);
+    expect((await http().get('/api/product-catalog').set('Authorization', t1).expect(200)).body).toHaveLength(1);
+    expect((await http().get('/api/product-catalog').set('Authorization', t2).expect(200)).body).toEqual([]); // tenant-scoped
+
+    // a partner user is forbidden
+    await http().post('/api/auth/users').set('Authorization', t1).send({ email: 'pc@partner.co', password: 'pw', role: 'partner' }).expect(201);
+    const pt = `Bearer ${(await http().post('/api/auth/login').send({ email: 'pc@partner.co', password: 'pw' }).expect(201)).body.token}`;
+    await http().get('/api/product-catalog').set('Authorization', pt).expect(403);
+  });
+
   it('RBAC: a scoped partner logs in, sees only its session, can drop a file but cannot certify', async () => {
     // Two relationships under t1; a partner is scoped to only one of them.
     for (const id of ['rbac-a', 'rbac-b']) {

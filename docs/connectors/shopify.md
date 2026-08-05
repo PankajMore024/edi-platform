@@ -230,7 +230,7 @@ A+B are the honest "prod-ready, tested, no creds" deliverable. C is prod code, m
 | Piece | State |
 |---|---|
 | This spec | ✅ written |
-| A — SKU engine + split | ◐ core built (`src/dropship/`: `SkuResolver` catalog→prefix→unmapped; `OrderRouter` multi-vendor split + SKU translate + pack/uom convert; durable `product_catalog` table + `ProductCatalogRepository`; 10 tests). **Remaining:** pipeline wiring (apply on 850 emit; unmapped → review-queue exception) + console SKU-catalog screen (CSV import/manage) |
+| A — SKU engine + split | ✅ built: `src/dropship/` (`SkuResolver` catalog→prefix→unmapped; `OrderRouter` split + translate + pack/uom); durable `product_catalog` + repo; **management API** (`/product-catalog`, client-only) + **console screen** (Resources → Product catalog: add/delete + CSV import); seeded demo bindings. Tests: 10 engine/repo + 1 e2e. **Applying the router on 850 emit + unmapped→exception lands in B** (needs the Shopify canonical source). |
 | B — translation + webhook | ⬜ |
 | C — Admin API client | ⬜ (mock) |
 | D — live cert (dev store) | ⬜ (needs a free dev store) |

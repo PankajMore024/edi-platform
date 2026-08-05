@@ -17,6 +17,7 @@ import { ConnectorInstanceRepository } from './db/repositories/connector-instanc
 import { TransactionRepository } from './db/repositories/transaction.repository';
 import { ProcessingRepository } from './db/repositories/processing.repository';
 import { CertificationRepository } from './db/repositories/certification.repository';
+import { ProductCatalogRepository } from './db/repositories/product-catalog.repository';
 import { RawArtifactRepository } from './db/repositories/raw-artifact.repository';
 import { CertificationService } from './certification/certification.service';
 import { X12Service } from './x12/x12.service';
@@ -120,6 +121,15 @@ async function main(): Promise<void> {
   for (let i = 0; i < 3; i++) await save('856', 'inbound', SAMPLE_856_DOC, 'DELIVERED', true, i);
   for (let i = 0; i < 2; i++) await save('810', 'inbound', withPo(SAMPLE_810_DOC, `PO-${4500 + i}`), 'DELIVERED', true, i);
   await save('810', 'inbound', withPo(SAMPLE_810_DOC, 'PO-4599'), 'REJECTED', false, 6);
+
+  // product catalog — sellable SKU × vendor bindings (dropship routing/translation)
+  const catalog = new ProductCatalogRepository(db);
+  await catalog.bulkUpsert([
+    { tenantId: T, sellableSku: 'WIDGET-BLUE', vendorId: 'rel-ridgeline', vendorSku: 'RDG-4471', packSize: 12, uom: 'CA', priority: 1 },
+    { tenantId: T, sellableSku: 'WIDGET-BLUE', vendorId: 'rel-summit', vendorSku: 'SMT-BLU', priority: 2 },
+    { tenantId: T, sellableSku: 'GADGET-SM', vendorId: 'rel-summit', vendorSku: 'SMT-9', uom: 'EA' },
+    { tenantId: T, sellableSku: 'SPROCKET', vendorId: 'rel-ridgeline', vendorSku: 'RDG-88', packSize: 6, uom: 'CA' },
+  ]);
 
   // an exception (held for review) on Ridgeline
   await new ProcessingRepository(db).record({

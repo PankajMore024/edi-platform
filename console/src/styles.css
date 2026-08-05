@@ -265,3 +265,8 @@ td.rowacts{text-align:right;white-space:nowrap;}
 .iconbtn:hover{border-color:var(--border-strong);color:var(--ink);background:var(--surface-2);}
 .iconbtn.danger:hover{border-color:color-mix(in srgb,var(--bad) 45%,transparent);color:var(--bad);background:var(--bad-wash);}
 .iconbtn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── sku catalog add-row ── */
+tr.addrow td{background:var(--surface-2);}
+tr.addrow input{padding:6px 8px;border:1px solid var(--border-strong);border-radius:7px;background:var(--surface);color:var(--ink);font-size:12.5px;width:100%;}
+tr.addrow input:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent);}

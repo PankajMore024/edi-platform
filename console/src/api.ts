@@ -92,6 +92,15 @@ export interface SampleProfile {
   fields: Array<{ path: string; line: boolean; type: string; sample: string; suggestion?: { target: string; confidence: number } }>;
 }
 
+// ── product catalog (dropship SKU × vendor bindings) ──
+export interface CatalogEntry { sellableSku: string; vendorId: string; vendorSku: string; packSize?: number; uom?: string; priority?: number; active?: boolean; }
+export const productCatalog = {
+  list: () => req<CatalogEntry[]>('/product-catalog'),
+  upsert: (e: CatalogEntry) => req<{ ok: true }>('/product-catalog', { method: 'POST', body: JSON.stringify(e) }),
+  bulk: (entries: CatalogEntry[]) => req<{ upserted: number; skipped: number }>('/product-catalog/bulk', { method: 'POST', body: JSON.stringify({ entries }) }),
+  remove: (sellableSku: string, vendorId: string) => req<{ deleted: boolean }>(`/product-catalog?sellableSku=${encodeURIComponent(sellableSku)}&vendorId=${encodeURIComponent(vendorId)}`, { method: 'DELETE' }),
+};
+
 // ── auth / principal ──
 export type Role = 'client_admin' | 'client_ops' | 'partner';
 /** Which side of a relationship an action is attributed to (the backend's Party), derived from a Role. */
