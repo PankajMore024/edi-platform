@@ -75,6 +75,25 @@ until settled.
 
 ## Decision Log
 
+### 2026-08-05 — Connector program kickoff: Shopify spec [connectors]
+
+- **D97. Started building connectors to production quality, one at a time, spec-first — beginning with
+  Shopify.** New `docs/connectors/` (index + one md per connector, capturing micro-details end-to-end);
+  full Shopify spec in `docs/connectors/shopify.md`. **Confirmed design:** Shopify is **bidirectional** —
+  buy-side (Shopify customer order → canonical → **850 out to vendor(s)**) and sell-side (**partner 850 →
+  create the order in the client's Shopify**; Shopify fulfillment → 856/810 back). The connector-map is
+  shared/symmetric; only the transport action differs. **SKU cross-ref = two strategies:** (1) a **prefix
+  convention** at runtime (reseller's per-vendor prefix ⇒ routing + strip ⇒ vendor SKU; new
+  `stripPrefix`/`addPrefix` transform ops) as the lightweight default, and (2) an opt-in durable
+  **`product_catalog` table** (sellable_sku × vendor × vendor_sku × pack × uom × priority) for robust
+  handling — catalog → prefix → **unmapped ⇒ exception**. **Multi-vendor split** (one order → N 850s) is
+  driven by that same SKU→vendor resolution. **Sell-side** = a template over a standard 850→order
+  structure (Draft Order create). **Honesty:** translation + webhook HMAC + edge cases (~75%) are
+  prod-grade and testable creds-free; live Admin API (OAuth/custom-app token, create/fulfill/inventory) is
+  written+mock-tested, validated only against a **free Shopify dev store**. **Build order A→B→C→D**
+  (A: SKU/catalog engine + split; B: translation + webhook; C: API client; D: live cert). Seeded
+  `shopify-webstore` is an illustrative stub, to be replaced. Next: build **A**.
+
 ### 2026-08-05 — Phase 3: connector CRUD + honest connector/transport status [console]
 
 - **D96. Configured connectors are now fully CRUD-able; recorded the real (stub) status of platform
