@@ -15,6 +15,7 @@ import { ConnectorInstanceRepository } from './repositories/connector-instance.r
 import { ApiKeyRepository } from './repositories/api-key.repository';
 import { CertificationRepository } from './repositories/certification.repository';
 import { UserRepository } from './repositories/user.repository';
+import { ProductCatalogRepository } from './repositories/product-catalog.repository';
 
 /**
  * Provides the shared Kysely connection + durable repositories, and bootstraps the schema on startup.
@@ -41,12 +42,14 @@ import { UserRepository } from './repositories/user.repository';
     { provide: ApiKeyRepository, useFactory: (db: Kysely<DB>) => new ApiKeyRepository(db), inject: [DATABASE] },
     { provide: CertificationRepository, useFactory: (db: Kysely<DB>) => new CertificationRepository(db), inject: [DATABASE] },
     { provide: UserRepository, useFactory: (db: Kysely<DB>) => new UserRepository(db), inject: [DATABASE] },
+    { provide: ProductCatalogRepository, useFactory: (db: Kysely<DB>) => new ProductCatalogRepository(db), inject: [DATABASE] },
   ],
   exports: [
     DATABASE, RawArtifactRepository, DedupRepository, ProcessingRepository,
     ControlNumberRepository, RelationshipRepository, DocSpecRepository, PartnerMapRepository,
     ConnectorMapRepository, TransportInstanceRepository, TransactionRepository, DbLifecycleSink,
     ConnectorInstanceRepository, ApiKeyRepository, CertificationRepository, UserRepository,
+    ProductCatalogRepository,
   ],
 })
 export class DatabaseModule implements OnModuleInit, OnModuleDestroy {

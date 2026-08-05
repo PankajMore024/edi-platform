@@ -463,6 +463,19 @@ export async function createSchema(db: Kysely<DB>): Promise<void> {
     .addColumn('revoked', 'integer', (c) => c.notNull())
     .execute();
   await db.schema.createIndex('user_session_token').ifNotExists().on('user_session').columns(['token_hash']).unique().execute();
+
+  // ── dropship plane ──
+  await db.schema.createTable('product_catalog').ifNotExists()
+    .addColumn('id', 'text', (c) => c.primaryKey())
+    .addColumn('tenant_id', 'text', (c) => c.notNull())
+    .addColumn('sellable_sku', 'text', (c) => c.notNull())
+    .addColumn('relationship_id', 'text', (c) => c.notNull())
+    .addColumn('vendor_sku', 'text', (c) => c.notNull())
+    .addColumn('pack_size', 'text').addColumn('uom', 'text').addColumn('priority', 'integer')
+    .addColumn('active', 'integer', (c) => c.notNull())
+    .execute();
+  await db.schema.createIndex('product_catalog_sku').ifNotExists().on('product_catalog').columns(['tenant_id', 'sellable_sku']).execute();
+  await db.schema.createIndex('product_catalog_binding').ifNotExists().on('product_catalog').columns(['tenant_id', 'sellable_sku', 'relationship_id']).unique().execute();
 }
 
 /** Every table name, for verification/introspection. */
@@ -477,4 +490,5 @@ export const ALL_TABLES = [
   'certification_session', 'certification_doc', 'certification_test_file', 'certification_issue',
   'certification_message', 'certification_event',
   'console_user', 'user_relationship_scope', 'user_session',
+  'product_catalog',
 ] as const;

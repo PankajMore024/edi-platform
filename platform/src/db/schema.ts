@@ -190,6 +190,14 @@ export interface ConsoleUserTable {
 export interface UserRelationshipScopeTable { id: string; user_id: string; relationship_id: string; }
 export interface UserSessionTable { id: string; user_id: string; token_hash: string; created_at: Ts; revoked: Bool; }
 
+// ── DROPSHIP PLANE ──────────────────────────────────────────────────────────
+// The product catalog: each row binds a sellable SKU to a vendor's part number (+ pack/uom). Drives
+// multi-vendor split + SKU translation. See docs/connectors/shopify.md §4. pack_size is TEXT decimal.
+export interface ProductCatalogTable {
+  id: string; tenant_id: string; sellable_sku: string; relationship_id: string; vendor_sku: string;
+  pack_size: string | null; uom: string | null; priority: number | null; active: Bool;
+}
+
 /** The Kysely database. Pass as `Kysely<DB>`. */
 export interface DB {
   tenant: TenantTable;
@@ -234,4 +242,5 @@ export interface DB {
   console_user: ConsoleUserTable;
   user_relationship_scope: UserRelationshipScopeTable;
   user_session: UserSessionTable;
+  product_catalog: ProductCatalogTable;
 }
